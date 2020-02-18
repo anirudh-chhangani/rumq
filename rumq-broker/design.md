@@ -123,6 +123,9 @@ Distributed commit log
   save a single commitlog per topic make make the subscribers just hold
   offset like kafka does
 
+
+
+
 TODO
 ---------------
 

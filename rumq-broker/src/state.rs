@@ -45,7 +45,7 @@ pub struct MqttState {
     /// Packet id of the last outgoing packet
     last_pkid: PacketIdentifier,
     /// Outgoing QoS 1 publishes which aren't acked yet
-    pub outgoing_publishes: VecDeque<Publish>,
+    pub outgoing_publishes: VecDeque<PacketIdentifier>,
     /// Clean session
     pub clean_session: bool,
     /// Lastwill
@@ -135,7 +135,7 @@ impl MqttState {
     /// matching packet identifier. Removal is now a O(n) operation. This should be
     /// usually ok in case of acks due to ack ordering in normal conditions.
     fn handle_incoming_puback(&mut self, pkid: PacketIdentifier) -> Result<Option<RouterMessage>, Error> {
-        match self.outgoing_publishes.iter().position(|x| x.pkid == Some(pkid)) {
+        match self.outgoing_publishes.iter().position(|id| *id == pkid) {
             Some(index) => {
                 let _publish = self.outgoing_publishes.remove(index).expect("Wrong index");
                 Ok(None)
@@ -191,7 +191,7 @@ impl MqttState {
     fn add_packet_id_and_save(&mut self, mut publish: Publish) -> Publish {
         let pkid = self.next_pkid();
         publish.set_pkid(pkid);
-        self.outgoing_publishes.push_back(publish.clone());
+        self.outgoing_publishes.push_back(pkid);
         publish
     }
 

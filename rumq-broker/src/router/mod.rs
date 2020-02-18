@@ -12,6 +12,8 @@ use std::fmt;
 
 use crate::state::{self, MqttState};
 
+mod commitlog;
+
 #[derive(Debug, From)]
 pub enum Error {
     State(state::Error),
@@ -59,6 +61,7 @@ impl fmt::Debug for Connection {
 #[derive(Debug)]
 struct ActiveConnection {
     pub state: MqttState,
+    pub offset: (usize, usize),
     pub outgoing: VecDeque<Packet>,
     tx: Sender<RouterMessage>
 }
@@ -67,6 +70,7 @@ impl ActiveConnection {
     pub fn new(tx: Sender<RouterMessage>, state: MqttState) -> ActiveConnection {
         ActiveConnection {
             state,
+            offset: (0, 0),
             outgoing: VecDeque::new(),
             tx
         }
@@ -103,6 +107,7 @@ impl Subscriber {
 
 #[derive(Debug)]
 pub struct Router {
+    commitlog: commitlog::CommitLog,
     // handles to all active connections. used to route data
     active_connections:     HashMap<String, ActiveConnection>,
     // inactive persistent connections
@@ -121,6 +126,7 @@ pub struct Router {
 impl Router {
     pub fn new(data_rx: Receiver<(String, RouterMessage)>) -> Self {
         Router {
+            commitlog: commitlog::CommitLog::new(10 * 1024 * 1024, 100).unwrap(),
             active_connections: HashMap::new(),
             inactive_connections: HashMap::new(),
             concrete_subscriptions: HashMap::new(),
@@ -132,7 +138,7 @@ impl Router {
 
     pub async fn start(&mut self) -> Result<(), Error> {
         let mut interval = time::interval(Duration::from_millis(10));
-        
+
         loop {
             select! {
                 o = self.data_rx.recv() => {
@@ -148,9 +154,7 @@ impl Router {
                     }
 
                     // adds routes, routes the message to other connections etc etc
-                    if let Err(e) = self.route(id, message) {
-                        error!("Routing error = {:?}", e);
-                    }
+                    self.fill_and_track(id, message);
                 }
                 _ = interval.next() => {
                     for (_, connection) in self.active_connections.iter_mut() {
@@ -161,8 +165,6 @@ impl Router {
                     }
                 }
             }
-
-
         }
     }
 
@@ -188,15 +190,18 @@ impl Router {
         }
     }
 
-    fn route(&mut self, id: String, message: RouterMessage) -> Result<(), Error> {
+    /// fills publishes to the commit log and tracks new routes
+    fn fill_and_track(&mut self, id: String, message: RouterMessage) {
         match message {
             RouterMessage::Packet(packet) => {
                 match packet {
-                    Packet::Publish(publish) => self.match_subscriptions(&id, publish),
+                    Packet::Publish(publish) => {
+                        self.fill_commitlog(publish.clone());
+                    }
                     Packet::Subscribe(subscribe) => self.add_to_subscriptions(id, subscribe),
                     Packet::Unsubscribe(unsubscribe) => self.remove_from_subscriptions(id, unsubscribe),
                     Packet::Disconnect => self.deactivate(id),
-                    _ => return Ok(())
+                    _ => return
                 }
             }
             RouterMessage::Death(id) => {
@@ -204,7 +209,15 @@ impl Router {
             }
             _ => () 
         }
-        Ok(())
+    }
+
+    fn route(&mut self) {
+        for (_, connection) in self.active_connections.iter_mut() {
+            let pending = connection.outgoing.split_off(0);
+            if pending.len() > 0 {
+                let _ = connection.tx.try_send(RouterMessage::Packets(pending));
+            }
+        }
     }
 
     fn handle_connect(&mut self, connect: Connect, connection_handle: Sender<RouterMessage>) -> Result<Option<RouterMessage>, Error> {
@@ -223,7 +236,8 @@ impl Router {
             if let Some(connection) = self.inactive_connections.remove(&id) {
                 let pending = connection.state.outgoing_publishes.clone();
                 self.active_connections.insert(id.clone(), ActiveConnection::new(connection_handle, connection.state));
-                Some(RouterMessage::Pending(pending))
+                // Some(RouterMessage::Pending(pending))
+                None
             } else {
                 let state = MqttState::new(clean_session, will);
                 self.active_connections.insert(id.clone(), ActiveConnection::new(connection_handle, state));
@@ -249,7 +263,13 @@ impl Router {
         Ok(reply)
     }
 
-    fn match_subscriptions(&mut self, _id: &str, publish: Publish) {
+    fn fill_commitlog(&mut self, publish: Publish) {
+        if let Err(e) = self.commitlog.fill(publish) {
+            error!("Failed to fill the commitlog. Error = {:?}", e);
+        }
+    }
+
+    fn match_and_fill_subscriptions(&mut self, _id: &str, publish: Publish) {
         if publish.retain {
             if publish.payload.len() == 0 {
                 self.retained_publishes.remove(&publish.topic_name);
@@ -473,7 +493,7 @@ impl Router {
                 let qos = will.qos;
 
                 let publish = publish(topic, qos, message);
-                self.match_subscriptions(&id, publish);
+                self.match_and_fill_subscriptions(&id, publish);
             }
 
             if !connection.state.clean_session {
