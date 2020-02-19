@@ -47,6 +47,8 @@ We don't have to copy data to inactive persistent connections and
 bloating the memory per inactive connection with the hope that the
 reconnection will happen soon
 
+Subscriptions can go back in time like kafka
+
 Router should scale across threads, processes and machines
 ---------------------
 
