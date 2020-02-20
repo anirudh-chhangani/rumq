@@ -187,7 +187,7 @@ impl ActiveConnection {
             if has_wildcards(topic) {
                 self.wild_subscriptions.remove(topic);
             } else {
-                self.wild_subscriptions.remove(topic);
+                self.concrete_subscriptions.remove(topic);
             };
         }
     }
@@ -228,6 +228,8 @@ pub struct Router {
     inactive_connections:   HashMap<String, InactiveConnection>,
     // retained publishes
     retained_publishes:     HashMap<String, Publish>,
+    // all failed connections for a route
+    graveyard: Vec<String>,
     // channel receiver to receive data from all the active_connections.
     // each connection will have a tx handle
     data_rx:                Receiver<(String, RouterMessage)>,
@@ -240,6 +242,7 @@ impl Router {
             active_connections: HashMap::new(),
             inactive_connections: HashMap::new(),
             retained_publishes: HashMap::new(),
+            graveyard: Vec::new(),
             data_rx,
         }
     }
@@ -252,20 +255,18 @@ impl Router {
                 o = self.data_rx.recv() => {
                     let (id, mut message) = o.unwrap();                   
                     debug!("In router message. Id = {}, {:?}", id, message);
-                    match self.reply(id.clone(), &mut message) {
-                        Ok(Some(message)) => self.forward(&id, message),
-                        Ok(None) => (),
-                        Err(e) => {
+
+                    if let Err(e) = self.reply(id.clone(), &mut message) {
                             error!("Incoming handle error = {:?}", e);
                             continue;
-                        }
                     }
 
                     // adds routes, routes the message to other connections etc etc
                     self.fill_and_track(id, message);
                 }
                 _ = interval.next() => {
-                    self.route()
+                    self.route();
+                    self.reap();
                 }
             }
 
@@ -280,20 +281,78 @@ impl Router {
     /// generates reply to send backto the connection. Shouldn't touch anything except active and 
     /// inactive connections
     /// No routing modifications here
-    fn reply(&mut self, id: String, message: &mut RouterMessage) -> Result<Option<RouterMessage>, Error> {
-        match message {
+    fn reply(&mut self, id: String, message: &mut RouterMessage) -> Result<(), Error> {
+        let reply = match message {
             RouterMessage::Connect(connection) => {
                 let handle = connection.handle.take().unwrap();
                 let message = self.handle_connect(connection.connect.clone(), handle)?;
-                Ok(message)
+                message
             }
             RouterMessage::Packet(packet) => {
                 let message = self.handle_incoming_packet(&id, packet.clone())?;
-                Ok(message)
+                message
             }
-            _ => Ok(None)
-        }
+            _ => None
+        };
+
+        if let Some(reply) = reply {
+            let graveyard = &mut self.graveyard;
+            if let Some(connection) = self.active_connections.get_mut(&id) {
+                if let Err(_) = forward(&id, &mut connection.tx, reply) {
+                    graveyard.push(id.clone());
+                }
+            }
+        };
+
+        Ok(())
     }
+
+    fn route(&mut self) {
+        let active_connections = &mut self.active_connections;
+        let graveyard = &mut self.graveyard;
+
+        for (id, connection) in active_connections.iter_mut() {
+            if connection.retained.len() > 0 {
+                let mut publishes = connection.retained.split_off(0);
+                // TODO: Use correct qos
+                connection.state.handle_outgoing_publishes(QoS::AtLeastOnce, &mut publishes);
+                let _ = connection.tx.try_send(RouterMessage::Publishes(publishes));
+            }
+
+            let concrete_subscriptions = &mut connection.concrete_subscriptions;
+            let commitlog = &self.commitlog;
+            // forward to all the concrete subscriptions
+            for (filter, subscription) in concrete_subscriptions.iter_mut() {
+                let qos = subscription.qos;
+                if let Some(publishes) = commitlog.get(filter) {
+                    let mut publishes = publishes.clone();
+                    connection.state.handle_outgoing_publishes(qos, &mut publishes);
+                    if let Err(_) = forward(&id, &mut connection.tx, RouterMessage::Publishes(publishes)) {
+                        graveyard.push(id.clone());
+                    }
+                }
+            }
+
+            // TODO: O(n^2) which happens during every route. publish perf is going to be bad
+            // forward to all the wild subscriptions
+            let wild_subscriptions = &mut connection.wild_subscriptions; 
+            for (filter, subscription) in wild_subscriptions.into_iter() {
+                let qos = subscription.qos;
+                for (topic, publishes) in commitlog.iter() {
+                    if matches(&topic, &filter) {
+                        let mut publishes = publishes.clone();
+                        connection.state.handle_outgoing_publishes(qos, &mut publishes);
+                        if let Err(_) = forward(&id, &mut connection.tx, RouterMessage::Publishes(publishes)) {
+                            graveyard.push(id.clone());
+                        }
+                    }
+                }
+            };
+        }
+
+        mem::replace(&mut self.commitlog, HashMap::new());
+    }
+
 
     /// fills publishes to the commit log and tracks new routes
     fn fill_and_track(&mut self, id: String, message: RouterMessage) {
@@ -375,47 +434,10 @@ impl Router {
         Ok(reply)
     }
 
-    fn route(&mut self) {
-        let active_connections = &mut self.active_connections;
-        let mut closed_connections = Vec::new();
-        let graveyard = &mut closed_connections;
-
-        for (id, connection) in active_connections.iter_mut() {
-            if connection.retained.len() > 0 {
-                let mut publishes = connection.retained.split_off(0);
-                // TODO: Use correct qos
-                connection.state.handle_outgoing_publishes(QoS::AtLeastOnce, &mut publishes);
-                let _ = connection.tx.try_send(RouterMessage::Publishes(publishes));
-            }
-
-            let concrete_subscriptions = &mut connection.concrete_subscriptions;
-            let commitlog = &self.commitlog;
-            for (filter, subscription) in concrete_subscriptions.iter_mut() {
-                let qos = subscription.qos;
-                if let Some(publishes) = commitlog.get(filter) {
-                    let mut publishes = publishes.clone();
-                    connection.state.handle_outgoing_publishes(qos, &mut publishes);
-                    match connection.tx.try_send(RouterMessage::Publishes(publishes)) {
-                        Ok(_) => continue,
-                        Err(TrySendError::Full(_)) => {
-                            error!("Routint to a closed connection. Id = {:?}", id);
-                            graveyard.push(id.clone());
-                            continue;
-                        }
-                        Err(TrySendError::Closed(_)) => {
-                            error!("Routint to a closed connection. Id = {:?}", id);
-                            graveyard.push(id.clone());
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
-        mem::replace(&mut self.commitlog, HashMap::new());
-
-        for id in closed_connections.into_iter() {
-            if let Some(connection) = active_connections.remove(&id) {
+    fn reap(&mut self) {
+        let graveyard = self.graveyard.split_off(0);
+        for id in graveyard.into_iter() {
+            if let Some(connection) = self.active_connections.remove(&id) {
                 self.inactive_connections.insert(id.to_owned(), InactiveConnection::new(connection.state));
             }
         }
@@ -484,8 +506,7 @@ impl Router {
                 Ok(Some(reply)) => reply,
                 Ok(None) => return Ok(None),
                 Err(state::Error::Unsolicited(packet)) => {
-                    // NOTE: Some clients seems to be sending pending acks after reconnection
-                    // even during a clean session. Let's be little lineant for now
+                    // let's be little lineant for now
                     error!("Unsolicited ack = {:?}. Id = {}", packet, id);
                     return Ok(None)
                 }
@@ -501,31 +522,24 @@ impl Router {
 
         Ok(None)
     }
-
-    fn forward(&mut self, id: &str, message: RouterMessage) {
-        if let Some(connection) = self.active_connections.get_mut(id) {
-            // slow connections should be moved to inactive connections. This drops tx handle of the
-            // connection leading to connection disconnection
-            if let Err(e) = connection.tx.try_send(message) {
-                match e {
-                    TrySendError::Full(_m) => {
-                        error!("Slow connection during forward. Dropping handle and moving id to inactive list. Id = {}", id);
-                        if let Some(connection) = self.active_connections.remove(id) {
-                            self.inactive_connections.insert(id.to_owned(), InactiveConnection::new(connection.state));
-                        }
-                    }
-                    TrySendError::Closed(_m) => {
-                        error!("Closed connection. Forward failed");
-                        self.active_connections.remove(id);
-                    }
-                }
-            }
-        }
-    }
 }
 
 
+fn forward(id: &str, connection_tx: &mut Sender<RouterMessage>, message: RouterMessage) -> Result<(), ()> {
+    match connection_tx.try_send(message) {
+        Ok(_) => (),
+        Err(TrySendError::Full(_)) => {
+            error!("Routint to a closed connection. Id = {:?}", id);
+            return Err(())
+        }
+        Err(TrySendError::Closed(_)) => {
+            error!("Routint to a closed connection. Id = {:?}", id);
+            return Err(())
+        }
+    }
 
+    Ok(())
+}
 
 #[cfg(test)]
 mod test {

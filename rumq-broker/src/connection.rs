@@ -162,11 +162,7 @@ async fn select<S: Network>(
             timeout.reset(Instant::now() + keep_alive);
             let o = match o {
                 Some(o) => o,
-                None => {
-                    let done = true;
-                    let packet = None;
-                    return Ok((done, packet))
-                }
+                None => return Err(Error::StreamDone)
             };
 
             match o? {
