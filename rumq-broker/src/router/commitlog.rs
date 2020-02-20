@@ -16,7 +16,7 @@ pub struct Messages {
     // current log offset
     pub log_offset: usize,
     // packets
-    pub packets: Vec<Packet>,
+    pub packets: Vec<Publish>,
 }
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ struct Segment {
     // timestamp when the log is created
     timestamp: u128,
     // all the packets in this segment
-    packets: Vec<Packet>,
+    packets: Vec<Publish>,
 }
 
 impl Segment {
@@ -50,7 +50,7 @@ impl Segment {
     // Some(offset of the last element) in the segment
     pub fn fill(&mut self, pubilsh: Publish) -> Option<u64> {
         let payload_size = pubilsh.payload.len();
-        self.packets.push(Packet::Publish(pubilsh));
+        self.packets.push(pubilsh);
         self.current_size += payload_size;
 
         if self.current_size >= self.max_size {
@@ -138,7 +138,7 @@ impl CommitLog {
                 continue;
             }
 
-            let o: Vec<Packet> = segment.packets.split_at(log_offset).1.iter().take(count).cloned().collect();
+            let o: Vec<Publish> = segment.packets.split_at(log_offset).1.iter().take(count).cloned().collect();
             let collected_message_count = o.len();
             messages.segment_id = segment.id;
             messages.log_offset = log_offset + o.len() - 1;

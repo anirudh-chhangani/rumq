@@ -33,7 +33,7 @@ pub enum RouterMessage {
     /// Packet
     Packet(Packet),
     /// Packets
-    Packets(Vec<Packet>),
+    Publishes(Vec<Publish>),
     /// Disconnects a client from active connections list. Will handling
     Death(String),
     /// Pending messages of the previous connection
@@ -156,7 +156,6 @@ impl Router {
 
     fn deactivate_and_forward_will(&mut self, id: String) {
         info!("Deactivating client due to connection death. Id = {}", id);
-
         if let Some(_connection) = self.active_connections.remove(&id) {}
     }
 
@@ -169,9 +168,9 @@ impl Router {
                 let (segment_id, log_offset) = subscription.offset();
                 let qos = subscription.qos;
                 if let Some(logs) = commitlog.get(&filter, segment_id, log_offset, 100) {
-                    let packets = logs.packets.clone();
-                    connection.state.handle_outgoing_publishes(qos, packets.len());
-                    match connection.tx.try_send(RouterMessage::Packets(packets)) {
+                    let mut publishes = logs.packets.clone();
+                    connection.state.handle_outgoing_publishes(qos, &mut publishes);
+                    match connection.tx.try_send(RouterMessage::Publishes(publishes)) {
                         Ok(_) => {
                             subscription.update_offset(logs.segment_id, logs.log_offset + 1);
                             continue

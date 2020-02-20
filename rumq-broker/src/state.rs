@@ -87,10 +87,17 @@ impl MqttState {
 
     /// Adds next packet identifier to QoS 1 and 2 publish packets and returns
     /// it buy wrapping publish in packet
-    pub fn handle_outgoing_publishes(&mut self, qos: QoS, count: usize) {
+    pub fn handle_outgoing_publishes(&mut self, qos: QoS, publishes: &mut Vec<Publish>) {
         match qos {
             QoS::AtMostOnce => (),
-            QoS::AtLeastOnce | QoS::ExactlyOnce => self.add_packet_ids(count),
+            QoS::AtLeastOnce | QoS::ExactlyOnce => {
+                for publish in publishes.iter_mut() {
+                    let pkid = self.next_pkid();
+                    publish.pkid = Some(pkid);
+                    publish.qos = qos;
+                    self.outgoing_publishes.push_back(pkid);
+                }
+            }
         };
     }
 
@@ -176,17 +183,6 @@ impl MqttState {
         Ok(Some(routermessage))
     }
 
-    /// Add publish packet to the state and return the packet. This method clones the
-    /// publish packet to save it to the state. This might not be a problem during low
-    /// frequency/size data publishes but should ideally be `Arc`d while returning to
-    /// prevent deep copy of large messages as this is anyway immutable after adding pkid
-    fn add_packet_ids(&mut self, count: usize) {
-        for _ in 0..count {
-            let pkid = self.next_pkid();
-            self.outgoing_publishes.push_back(pkid);
-        }
-    }
-
     /// Increment the packet identifier from the state and roll it when it reaches its max
     /// http://stackoverflow.com/questions/11115364/mqtt-messageid-practical-implementation
     fn next_pkid(&mut self) -> PacketIdentifier {
@@ -208,33 +204,33 @@ mod test {
     use rumq_core::*;
 
     fn build_outgoing_publisheslish(qos: QoS) -> Publish {
-        Publish { dup: false, qos, retain: false, pkid: None, topic_name: "hello/world".to_owned(), payload: Arc::new(vec![1, 2, 3]) }
+    Publish { dup: false, qos, retain: false, pkid: None, topic_name: "hello/world".to_owned(), payload: Arc::new(vec![1, 2, 3]) }
     }
 
     fn build_incoming_publish(qos: QoS, pkid: u16) -> Publish {
-        Publish {
-            dup: false,
-            qos,
-            retain: false,
-            pkid: Some(PacketIdentifier(pkid)),
-            topic_name: "hello/world".to_owned(),
-            payload: Arc::new(vec![1, 2, 3]),
-        }
+    Publish {
+    dup: false,
+    qos,
+    retain: false,
+    pkid: Some(PacketIdentifier(pkid)),
+    topic_name: "hello/world".to_owned(),
+    payload: Arc::new(vec![1, 2, 3]),
+    }
     }
 
     fn build_mqttstate() -> MqttState {
-        MqttState::new()
+    MqttState::new()
     }
 
     #[test]
     fn next_pkid_roll() {
-        let mut mqtt = build_mqttstate();
-        let mut pkt_id = PacketIdentifier(0);
+    let mut mqtt = build_mqttstate();
+    let mut pkt_id = PacketIdentifier(0);
 
-        for _ in 0..65536 {
-            pkt_id = mqtt.next_pkid();
-        }
-        assert_eq!(PacketIdentifier(1), pkt_id);
+    for _ in 0..65536 {
+    pkt_id = mqtt.next_pkid();
+    }
+    assert_eq!(PacketIdentifier(1), pkt_id);
     }
     */
 }
