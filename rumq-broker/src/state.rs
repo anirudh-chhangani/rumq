@@ -45,7 +45,7 @@ pub struct MqttState {
     /// Packet id of the last outgoing packet
     last_pkid: PacketIdentifier,
     /// Outgoing QoS 1 publishes which aren't acked yet
-    pub outgoing_publishes: VecDeque<Publish>,
+    pub outgoing_publishes: VecDeque<PacketIdentifier>,
     /// Clean session
     pub clean_session: bool,
     /// Lastwill
@@ -87,19 +87,18 @@ impl MqttState {
 
     /// Adds next packet identifier to QoS 1 and 2 publish packets and returns
     /// it buy wrapping publish in packet
-    pub fn handle_outgoing_publish(&mut self, publish: Publish) -> Packet {
-        let publish = match publish.qos {
-            QoS::AtMostOnce => publish,
-            QoS::AtLeastOnce | QoS::ExactlyOnce => self.add_packet_id_and_save(publish),
+    pub fn handle_outgoing_publishes(&mut self, qos: QoS, publishes: &mut Vec<Publish>) {
+        match qos {
+            QoS::AtMostOnce => (),
+            QoS::AtLeastOnce | QoS::ExactlyOnce => {
+                for publish in publishes.iter_mut() {
+                    let pkid = self.next_pkid();
+                    publish.pkid = Some(pkid);
+                    publish.qos = qos;
+                    self.outgoing_publishes.push_back(pkid);
+                }
+            }
         };
-
-        // debug!(
-        //     "Outgoing Publish. Topic = {:?}, Pkid = {:?}, Payload Size = {:?}",
-        //     publish.topic_name(),
-        //     publish.pkid(),
-        //     publish.payload().len()
-        // );
-        Packet::Publish(publish)
     }
 
     /// Results in a publish notification in all the QoS cases. Replys with an ack
@@ -135,7 +134,7 @@ impl MqttState {
     /// matching packet identifier. Removal is now a O(n) operation. This should be
     /// usually ok in case of acks due to ack ordering in normal conditions.
     fn handle_incoming_puback(&mut self, pkid: PacketIdentifier) -> Result<Option<RouterMessage>, Error> {
-        match self.outgoing_publishes.iter().position(|x| x.pkid == Some(pkid)) {
+        match self.outgoing_publishes.iter().position(|id| *id == pkid) {
             Some(index) => {
                 let _publish = self.outgoing_publishes.remove(index).expect("Wrong index");
                 Ok(None)
@@ -184,17 +183,6 @@ impl MqttState {
         Ok(Some(routermessage))
     }
 
-    /// Add publish packet to the state and return the packet. This method clones the
-    /// publish packet to save it to the state. This might not be a problem during low
-    /// frequency/size data publishes but should ideally be `Arc`d while returning to
-    /// prevent deep copy of large messages as this is anyway immutable after adding pkid
-    fn add_packet_id_and_save(&mut self, mut publish: Publish) -> Publish {
-        let pkid = self.next_pkid();
-        publish.set_pkid(pkid);
-        self.outgoing_publishes.push_back(publish.clone());
-        publish
-    }
-
     /// Increment the packet identifier from the state and roll it when it reaches its max
     /// http://stackoverflow.com/questions/11115364/mqtt-messageid-practical-implementation
     fn next_pkid(&mut self) -> PacketIdentifier {
@@ -216,33 +204,33 @@ mod test {
     use rumq_core::*;
 
     fn build_outgoing_publisheslish(qos: QoS) -> Publish {
-        Publish { dup: false, qos, retain: false, pkid: None, topic_name: "hello/world".to_owned(), payload: Arc::new(vec![1, 2, 3]) }
+    Publish { dup: false, qos, retain: false, pkid: None, topic_name: "hello/world".to_owned(), payload: Arc::new(vec![1, 2, 3]) }
     }
 
     fn build_incoming_publish(qos: QoS, pkid: u16) -> Publish {
-        Publish {
-            dup: false,
-            qos,
-            retain: false,
-            pkid: Some(PacketIdentifier(pkid)),
-            topic_name: "hello/world".to_owned(),
-            payload: Arc::new(vec![1, 2, 3]),
-        }
+    Publish {
+    dup: false,
+    qos,
+    retain: false,
+    pkid: Some(PacketIdentifier(pkid)),
+    topic_name: "hello/world".to_owned(),
+    payload: Arc::new(vec![1, 2, 3]),
+    }
     }
 
     fn build_mqttstate() -> MqttState {
-        MqttState::new()
+    MqttState::new()
     }
 
     #[test]
     fn next_pkid_roll() {
-        let mut mqtt = build_mqttstate();
-        let mut pkt_id = PacketIdentifier(0);
+    let mut mqtt = build_mqttstate();
+    let mut pkt_id = PacketIdentifier(0);
 
-        for _ in 0..65536 {
-            pkt_id = mqtt.next_pkid();
-        }
-        assert_eq!(PacketIdentifier(1), pkt_id);
+    for _ in 0..65536 {
+    pkt_id = mqtt.next_pkid();
+    }
+    assert_eq!(PacketIdentifier(1), pkt_id);
     }
     */
 }

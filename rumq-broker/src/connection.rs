@@ -180,10 +180,10 @@ async fn select<S: Network>(
         }
         o = outgoing.next() => match o {
             Some(RouterMessage::Packet(packet)) => stream.get_mut().send(packet).await?,
-            Some(RouterMessage::Packets(packets)) => {
+            Some(RouterMessage::Publishes(packets)) => {
                 // TODO: Make these vectorized
                 for packet in packets.into_iter() {
-                    stream.get_mut().send(packet).await?
+                    stream.get_mut().send(Packet::Publish(packet)).await?
                 }
             }
             Some(message) => {

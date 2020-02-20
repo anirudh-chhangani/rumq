@@ -12,7 +12,7 @@ pub struct CommandLine {
 }
 
 
-#[tokio::main(core_threads = 1)]
+#[tokio::main(core_threads = 4)]
 async fn main() {
     pretty_env_logger::init();
 
