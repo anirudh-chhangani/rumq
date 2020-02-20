@@ -31,7 +31,7 @@ pub enum RouterMessage {
     /// Packet
     Packet(Packet),
     /// Packets
-    Packets(VecDeque<Packet>),
+    Packets(Vec<Packet>),
     /// Disconnects a client from active connections list. Will handling
     Death(String),
     /// Pending messages of the previous connection
@@ -61,8 +61,6 @@ impl fmt::Debug for Connection {
 #[derive(Debug)]
 struct ActiveConnection {
     pub state: MqttState,
-    pub offset: (usize, usize),
-    pub outgoing: VecDeque<Packet>,
     tx: Sender<RouterMessage>
 }
 
@@ -70,8 +68,6 @@ impl ActiveConnection {
     pub fn new(tx: Sender<RouterMessage>, state: MqttState) -> ActiveConnection {
         ActiveConnection {
             state,
-            offset: (0, 0),
-            outgoing: VecDeque::new(),
             tx
         }
     }
@@ -94,6 +90,7 @@ impl InactiveConnection {
 struct Subscriber {
     client_id: String,
     qos: QoS,
+    pub offset: (u64, usize),
 }
 
 impl Subscriber {
@@ -101,7 +98,16 @@ impl Subscriber {
         Subscriber {
             client_id: id.to_owned(),
             qos,
+            offset: (0, 0),
         }
+    }
+
+    pub fn update_offset(&mut self, segment_id: u64, log_offset: usize) {
+        self.offset = (segment_id, log_offset)
+    }
+
+    pub fn offset(&self) -> (u64, usize) {
+        self.offset
     }
 }
 
@@ -137,7 +143,7 @@ impl Router {
     }
 
     pub async fn start(&mut self) -> Result<(), Error> {
-        let mut interval = time::interval(Duration::from_millis(10));
+        let mut interval = time::interval(Duration::from_millis(100));
 
         loop {
             select! {
@@ -156,14 +162,7 @@ impl Router {
                     // adds routes, routes the message to other connections etc etc
                     self.fill_and_track(id, message);
                 }
-                _ = interval.next() => {
-                    for (_, connection) in self.active_connections.iter_mut() {
-                        let pending = connection.outgoing.split_off(0);
-                        if pending.len() > 0 {
-                            let _ = connection.tx.try_send(RouterMessage::Packets(pending));
-                        }
-                    }
-                }
+                _ = interval.next() => self.route(),
             }
         }
     }
@@ -204,20 +203,48 @@ impl Router {
                     _ => return
                 }
             }
-            RouterMessage::Death(id) => {
+            RouterMessage::Death(_) => {
                 self.deactivate_and_forward_will(id.to_owned());
             }
             _ => () 
         }
     }
 
+    fn deactivate_and_forward_will(&mut self, id: String) {
+        info!("Deactivating client due to connection death. Id = {}", id);
+
+        if let Some(_connection) = self.active_connections.remove(&id) {}
+        if let Some(_connection) = self.active_connections.remove(&id) {}
+    }
+
     fn route(&mut self) {
-        for (_, connection) in self.active_connections.iter_mut() {
-            let pending = connection.outgoing.split_off(0);
-            if pending.len() > 0 {
-                let _ = connection.tx.try_send(RouterMessage::Packets(pending));
+        let concrete_subscriptions = &mut self.concrete_subscriptions;
+        let active_connections = &mut self.active_connections;
+        let commitlog = &mut self.commitlog;
+
+        for (filter, subscribers) in concrete_subscriptions.iter_mut() {
+            for subscriber in subscribers.iter_mut() {
+                let (segment_id, log_offset) = subscriber.offset();
+                if let Some(logs) = commitlog.get(&filter, segment_id, log_offset, 100) {
+                    let packets = logs.packets.clone();
+                    if let Some(connection) = active_connections.get_mut(&subscriber.client_id) {
+                        connection.state.handle_outgoing_publishes(subscriber.qos, packets.len());
+                        match connection.tx.try_send(RouterMessage::Packets(packets)) {
+                            Ok(_) => {
+                                subscriber.update_offset(logs.segment_id, logs.log_offset + 1);
+                                continue
+                            }
+                            Err(e) => {
+                                error!("Failed to route. Error = {:?}", e);
+                                continue;
+                            }
+                        }
+                    }
+                }
             }
-        }
+        };
+
+        // TODO do the same thing for wildcard subscriptions
     }
 
     fn handle_connect(&mut self, connect: Connect, connection_handle: Sender<RouterMessage>) -> Result<Option<RouterMessage>, Error> {
@@ -269,37 +296,6 @@ impl Router {
         }
     }
 
-    fn match_and_fill_subscriptions(&mut self, _id: &str, publish: Publish) {
-        if publish.retain {
-            if publish.payload.len() == 0 {
-                self.retained_publishes.remove(&publish.topic_name);
-                return
-            } else {
-                self.retained_publishes.insert(publish.topic_name.clone(), publish.clone());
-            }
-        }
-
-        let topic = &publish.topic_name;
-        if let Some(subscribers) = self.concrete_subscriptions.get(topic) {
-            let subscribers = subscribers.clone();
-            for subscriber in subscribers.iter() {
-                self.fill_subscriber(subscriber, publish.clone());
-            }
-        }
-
-        // TODO: O(n) which happens during every publish. publish perf is going to be
-        // linearly degraded based on number of wildcard subscriptions. fix this
-        let wild_subscriptions = self.wild_subscriptions.clone(); 
-        for (filter, subscribers) in wild_subscriptions.into_iter() {
-            if matches(&topic, &filter) {
-                for subscriber in subscribers.into_iter() {
-                    let publish = publish.clone();
-                    self.fill_subscriber(&subscriber, publish);
-                }
-            }
-        };
-    }
-
 
     fn add_to_subscriptions(&mut self, id: String, subscribe: Subscribe) {
         // Each subscribe message can send multiple topics to subscribe to. handle dupicates
@@ -336,21 +332,6 @@ impl Router {
                     let mut subscribers = Vec::new();
                     subscribers.push(subscriber.clone());
                     subscriptions.insert(filter.to_owned(), subscribers);
-                }
-            }
-
-            // Handle retained publishes after subscription duplicates are handled above
-            if has_wildcards(&filter) {
-                let retained_publishes = self.retained_publishes.clone();
-                for (topic, publish) in retained_publishes.into_iter() {
-                    if matches(&topic, &filter) {
-                        self.fill_subscriber(&subscriber, publish);
-                    }
-                }
-            } else {
-                if let Some(publish) = self.retained_publishes.get(&filter) {
-                    let publish = publish.clone();
-                    self.fill_subscriber(&subscriber, publish);
                 }
             }
         }
@@ -483,25 +464,6 @@ impl Router {
         }
     }
 
-    fn deactivate_and_forward_will(&mut self, id: String) {
-        info!("Deactivating client due to connection death. Id = {}", id);
-
-        if let Some(mut connection) = self.active_connections.remove(&id) {
-            if let Some(mut will) = connection.state.will.take() {
-                let topic = mem::replace(&mut will.topic, "".to_owned());
-                let message = mem::replace(&mut will.message, "".to_owned());
-                let qos = will.qos;
-
-                let publish = publish(topic, qos, message);
-                self.match_and_fill_subscriptions(&id, publish);
-            }
-
-            if !connection.state.clean_session {
-                self.inactive_connections.insert(id.clone(), InactiveConnection::new(connection.state));
-            }
-        }
-    }
-
     /// Saves state and sends network reply back to the connection
     fn handle_incoming_packet(&mut self, id: &str, packet: Packet) -> Result<Option<RouterMessage>, Error> {
         if let Some(connection) = self.active_connections.get_mut(id) {
@@ -527,21 +489,23 @@ impl Router {
         Ok(None)
     }
 
+    /*
     // forwards data to the connection with the following id
     fn fill_subscriber(&mut self, subscriber: &Subscriber, mut publish: Publish)  {
-        publish.qos = subscriber.qos;
+    publish.qos = subscriber.qos;
 
-        if let Some(connection) = self.inactive_connections.get_mut(&subscriber.client_id) {
-            debug!("Forwarding publish to active connection. Id = {}, {:?}", subscriber.client_id, publish);
-            connection.state.handle_outgoing_publish(publish); 
-            return
-        }
-
-        if let Some(connection) = self.active_connections.get_mut(&subscriber.client_id) {
-            let packet = connection.state.handle_outgoing_publish(publish); 
-            connection.outgoing.push_back(packet);
-        }
+    if let Some(connection) = self.inactive_connections.get_mut(&subscriber.client_id) {
+    debug!("Forwarding publish to active connection. Id = {}, {:?}", subscriber.client_id, publish);
+    connection.state.handle_outgoing_publish(publish); 
+    return
     }
+
+    if let Some(connection) = self.active_connections.get_mut(&subscriber.client_id) {
+    let packet = connection.state.handle_outgoing_publish(publish); 
+    connection.outgoing.push_back(packet);
+    }
+    }
+    */
 
     fn forward(&mut self, id: &str, message: RouterMessage) {
         if let Some(connection) = self.active_connections.get_mut(id) {

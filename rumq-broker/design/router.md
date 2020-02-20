@@ -49,7 +49,64 @@ reconnection will happen soon
 
 Subscriptions can go back in time like kafka
 
-Router should scale across threads, processes and machines
----------------------
+
+Routing data to clients can be a little tricky
+
+The current architecture maps subsciptions to subscribers
+
+```rust
+#[derive(Debug)]
+pub struct Router {
+    commitlog: commitlog::CommitLog,
+    active_connections:     HashMap<String, ActiveConnection>,
+    concrete_subscriptions: HashMap<String, Vec<Subscriber>>,
+    wild_subscriptions:     HashMap<String, Vec<Subscriber>>,
+    data_rx:                Receiver<(String, RouterMessage)>,
+}
+```
+
+Any new publish fills each active and inactive connection mapped by the
+subscriber. This way, a connection is indirectly part of multiple topics via
+subscribers. And the subscriber always will be part of subscriptions
+regardless of the connection status of a connection
+
+Now that sending data to an active connection is lazy, And offset is
+part of the subscriber. All the inactive subscribers can be removed the
+subscriptions
+
+Maybe a better option would be to make each active connection hold the
+subscriptions it is interested in. Since we anyway have to sweep all the
+active connection
+
+
+For every timer interval
+
+* go through a subscription and all the subscribers in it
+* get data from the commitlog based on subscriber offset
+* get active connection from subscriber id
+* send the data to the connection task and update commitlog offset
+
+or
+
+For every timer interval
+
+* go through active connections and all the subscriptions in it
+* get data from the commitlog for a given subscription
+* send the data to the connection task and update commitlog offset
+
+
+E.g
+
+Total 100 connections with 1000 subscriptions and they are unevenly
+distributed across connections. say connections 1..=10 hold all the
+subscriptions. 100 each.
+
+100 iterations. 1 per connections + 1000 iterations (1..=10 100
+iterations each)
+
+vs
+
+1000 iterations. 1 per subscription. + each subscription holds 100
+devices
 
 

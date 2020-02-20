@@ -87,19 +87,11 @@ impl MqttState {
 
     /// Adds next packet identifier to QoS 1 and 2 publish packets and returns
     /// it buy wrapping publish in packet
-    pub fn handle_outgoing_publish(&mut self, publish: Publish) -> Packet {
-        let publish = match publish.qos {
-            QoS::AtMostOnce => publish,
-            QoS::AtLeastOnce | QoS::ExactlyOnce => self.add_packet_id_and_save(publish),
+    pub fn handle_outgoing_publishes(&mut self, qos: QoS, count: usize) {
+        match qos {
+            QoS::AtMostOnce => (),
+            QoS::AtLeastOnce | QoS::ExactlyOnce => self.add_packet_ids(count),
         };
-
-        // debug!(
-        //     "Outgoing Publish. Topic = {:?}, Pkid = {:?}, Payload Size = {:?}",
-        //     publish.topic_name(),
-        //     publish.pkid(),
-        //     publish.payload().len()
-        // );
-        Packet::Publish(publish)
     }
 
     /// Results in a publish notification in all the QoS cases. Replys with an ack
@@ -188,11 +180,11 @@ impl MqttState {
     /// publish packet to save it to the state. This might not be a problem during low
     /// frequency/size data publishes but should ideally be `Arc`d while returning to
     /// prevent deep copy of large messages as this is anyway immutable after adding pkid
-    fn add_packet_id_and_save(&mut self, mut publish: Publish) -> Publish {
-        let pkid = self.next_pkid();
-        publish.set_pkid(pkid);
-        self.outgoing_publishes.push_back(pkid);
-        publish
+    fn add_packet_ids(&mut self, count: usize) {
+        for _ in 0..count {
+            let pkid = self.next_pkid();
+            self.outgoing_publishes.push_back(pkid);
+        }
     }
 
     /// Increment the packet identifier from the state and roll it when it reaches its max
