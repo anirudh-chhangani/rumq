@@ -161,7 +161,10 @@ impl Router {
 
     fn route(&mut self) {
         let active_connections = &mut self.active_connections;
-        for (_id, connection) in active_connections.iter_mut() {
+        let mut closed_connections = Vec::new();
+        let graveyard = &mut closed_connections;
+
+        for (id, connection) in active_connections.iter_mut() {
             let concrete_subscriptions = &mut connection.concrete_subscriptions;
             let commitlog = &self.commitlog;
             for (filter, subscription) in concrete_subscriptions.iter_mut() {
@@ -175,12 +178,24 @@ impl Router {
                             subscription.update_offset(logs.segment_id, logs.log_offset + 1);
                             continue
                         }
-                        Err(e) => {
-                            error!("Failed to route. Error = {:?}", e);
+                        Err(TrySendError::Full(_)) => {
+                            error!("Routint to a closed connection. Id = {:?}", id);
+                            graveyard.push(id.clone());
+                            continue;
+                        }
+                        Err(TrySendError::Closed(_)) => {
+                            error!("Routint to a closed connection. Id = {:?}", id);
+                            graveyard.push(id.clone());
                             continue;
                         }
                     }
                 }
+            }
+        }
+        
+        for id in closed_connections.into_iter() {
+            if let Some(connection) = active_connections.remove(&id) {
+                self.inactive_connections.insert(id.to_owned(), InactiveConnection::new(connection.state));
             }
         }
     }
