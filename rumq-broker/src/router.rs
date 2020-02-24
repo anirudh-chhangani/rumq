@@ -329,6 +329,7 @@ impl Router {
                     connection.state.handle_outgoing_publishes(qos, &mut publishes);
                     if let Err(_) = forward(&id, &mut connection.tx, RouterMessage::Publishes(publishes)) {
                         graveyard.push(id.clone());
+                        return
                     }
                 }
             }
@@ -344,6 +345,7 @@ impl Router {
                         connection.state.handle_outgoing_publishes(qos, &mut publishes);
                         if let Err(_) = forward(&id, &mut connection.tx, RouterMessage::Publishes(publishes)) {
                             graveyard.push(id.clone());
+                            return
                         }
                     }
                 }
@@ -529,11 +531,11 @@ fn forward(id: &str, connection_tx: &mut Sender<RouterMessage>, message: RouterM
     match connection_tx.try_send(message) {
         Ok(_) => (),
         Err(TrySendError::Full(_)) => {
-            error!("Routint to a closed connection. Id = {:?}", id);
+            error!("Routing to a closed connection. Id = {:?}", id);
             return Err(())
         }
         Err(TrySendError::Closed(_)) => {
-            error!("Routint to a closed connection. Id = {:?}", id);
+            error!("Routing to a closed connection. Id = {:?}", id);
             return Err(())
         }
     }

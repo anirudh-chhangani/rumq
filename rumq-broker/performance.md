@@ -41,6 +41,11 @@ Journal
 Moooree tools
 ----------
 
+* Compile to native cpu
+```
+RUSTFLAGS="-C target-cpu=native" cargo run --release
+```
+
 #####Flamegraph
 
 ```
@@ -59,7 +64,7 @@ perf report -g graph,0.5,caller
 
 References
 -----------
-
+* https://gist.github.com/jFransham/369a86eff00e5f280ed25121454acec1#cpu-architecture-primer
 * https://github.com/flamegraph-rs/flamegraph
 * https://gendignoux.com/blog/2019/11/09/profiling-rust-docker-perf.html
 

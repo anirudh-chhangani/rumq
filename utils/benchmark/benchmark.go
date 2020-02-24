@@ -63,11 +63,17 @@ type Connection struct {
 }
 
 func NewConnection(id string, total int, stats chan Statistics, progress chan uint64) *Connection {
+	connLostHandler := func(c mqtt.Client, err error) {
+		fmt.Printf("Connection lost, reason: %v\n", err)
+	}
+
 	opts := mqtt.NewClientOptions().AddBroker("tcp://localhost:1883")
 	opts.SetClientID(id)
 	opts.SetProtocolVersion(4)
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(10 * time.Second)
+	opts.SetKeepAlive(30 * time.Second)
+	opts.SetMaxReconnectInterval(10 * time.Second)
+	opts.SetConnectionLostHandler(connLostHandler)
 
 	c := mqtt.NewClient(opts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
@@ -83,6 +89,9 @@ func NewConnection(id string, total int, stats chan Statistics, progress chan ui
 	}
 }
 
+
+var totalCount uint64 = 0
+
 func (c *Connection) Start() {
 	var counter uint64
 	var start = time.Now()
@@ -90,10 +99,12 @@ func (c *Connection) Start() {
 
 	msgHandler := func(client mqtt.Client, msg mqtt.Message) {
 		count := atomic.AddUint64(&counter, 1)
+		atomic.AddUint64(&totalCount, 1)
 		if count == uint64(c.total) {
 			exit <- true
 		}
 	}
+
 
 	if token := c.client.Subscribe("hello/mqtt/rumqtt", 1, msgHandler); token.Wait() && token.Error() != nil {
 		panic(token.Error())
@@ -108,29 +119,18 @@ func (c *Connection) Start() {
 	}()
 
 
-	var last uint64
-	for {
-		select {
-		case <-time.After(100 * time.Millisecond):
-			c.progress <- counter - last
-			last = counter
-		case <-exit:
-			c.progress <- counter - last
-			totalSize := float64(c.total * opts.PayloadSize)
-			statistics := NewStatiscs(c.id, time.Since(start), counter, totalSize)
-			c.stats <- statistics 
-			time.Sleep(1 * time.Second)
-			return	
-		}
-	}
+	<-exit
+	totalSize := float64(c.total * opts.PayloadSize)
+	statistics := NewStatiscs(c.id, time.Since(start), counter, totalSize)
+	c.stats <- statistics 
+	return	
 }
 
 func main() {
 	exit := make(chan Statistics, 10)
-	progress := make(chan uint64, 100)
+	progress := make(chan uint64, 1000)
 	totalMessages :=  opts.Connections * opts.Messages
 	totalConnectionsDone := 0
-	totalMessagesDone := 0
 	progressbar := progressbar.NewOptions(totalMessages, progressbar.OptionSetTheme(progressbar.Theme{Saucer: "|", SaucerPadding: "."}))
 	results := make([]Statistics, 0)
 	var start = time.Now()
@@ -151,15 +151,17 @@ func main() {
 				fmt.Println("\n")
 				break L
 			}
-		case p := <- progress:
-			totalMessagesDone += int(p)
-			progressbar.Add(int(p))
+		case <-time.After(10 * time.Millisecond):
+			c := atomic.LoadUint64(&totalCount);
+			progressbar.Set(int(c))
 		}
 	}
 
+	c := int(atomic.LoadUint64(&totalCount))
+	progressbar.Set(c)
 
 	// size in MB
-	totalSize := float64(totalMessagesDone * opts.PayloadSize ) / 1024.0 / 1024.0
+	totalSize := float64(c * opts.PayloadSize ) / 1024.0 / 1024.0
 	// time in seconds
 	timeTaken := time.Since(start).Seconds()
 
@@ -168,5 +170,5 @@ func main() {
 		fmt.Println("Id =", statistics.id, "Total Messages =", statistics.totalMessageCount, "Average throughput =", statistics.totalSize/1024.0/1024.0/statistics.timeTaken.Seconds(), "MB/s")
 	}
 
-	fmt.Println("\n\n Total Messages = ", totalMessagesDone, "Average throughput = ", totalSize/timeTaken, "MB/s")
+	fmt.Println("\n\n Total Messages = ", c, "Average throughput = ", totalSize/timeTaken, "MB/s")
 }
