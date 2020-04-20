@@ -89,7 +89,6 @@ impl Publish {
             pkid: 0,
             topic: topic.into(),
             payload: bytes::Bytes::from(payload.into()),
-            bytes: Bytes::new(),
         }
     }
 

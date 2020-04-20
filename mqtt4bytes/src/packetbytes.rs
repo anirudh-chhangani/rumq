@@ -1,12 +1,15 @@
 use crate::packets::*;
 use crate::Error;
 use bytes::buf::Buf;
-use bytes::Bytes;
+use bytes::{Bytes, BufMut};
 use core::fmt::Debug;
 
 use crate::{qos, Protocol, QoS};
 use alloc::vec::Vec;
 use alloc::string::String;
+use byteorder::{ReadBytesExt, BigEndian};
+use core::mem;
+use core::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum Packet {
@@ -151,23 +154,36 @@ pub struct Publish {
     pub payload: Bytes,
     pub dup: bool,
     pub retain: bool,
-    pub bytes: Bytes,
 }
 
 impl Publish {
-    pub fn assemble(byte1: u8, variable_header_index: usize, bytes: Bytes) -> Result<Self, Error> {
-        let mut payload = bytes.clone();
+    pub fn assemble(byte1: u8, variable_header_index: usize, bytes: &mut [u8]) -> Result<Self, Error> {
         let qos = qos((byte1 & 0b0110) >> 1)?;
         let dup = (byte1 & 0b1000) != 0;
         let retain = (byte1 & 0b0001) != 0;
 
-        payload.advance(variable_header_index);
-        let topic = read_mqtt_string(&mut payload)?;
+        let (_, bytes) = bytes.split_at_mut(variable_header_index);
+        let (len, bytes) = bytes.split_at_mut(mem::size_of::<u16>());
+
+        let len = &len[..];
+        let len = u16::from_be_bytes(len.try_into().unwrap());
+        let (topic, bytes) = bytes.split_at_mut(len as usize);
+
+        let topic = match String::from_utf8(topic.to_vec()) {
+            Ok(v) => v,
+            Err(_e) => return Err(Error::TopicNotUtf8)
+        };
 
         // Packet identifier exists where QoS > 0
-        let pkid = match qos {
-            QoS::AtMostOnce => 0,
-            QoS::AtLeastOnce | QoS::ExactlyOnce => payload.get_u16()
+        let (pkid, bytes) = match qos {
+            QoS::AtMostOnce => {
+                (0, bytes)
+            },
+            QoS::AtLeastOnce | QoS::ExactlyOnce => {
+                let (pkid, bytes) = bytes.split_at_mut(mem::size_of::<u16>());
+                let pkid = &pkid[..];
+                (u16::from_be_bytes(pkid.try_into().unwrap()), bytes)
+            }
         };
 
         if qos != QoS::AtMostOnce && pkid == 0 {
@@ -178,10 +194,9 @@ impl Publish {
             qos,
             pkid,
             topic,
-            payload,
+            payload: Bytes::copy_from_slice(bytes),
             dup,
             retain,
-            bytes,
         };
 
         Ok(publish)
@@ -387,6 +402,19 @@ impl UnsubAck {
     }
 }
 
+fn read_mqtt_string2(mut stream: &mut &mut [u8]) -> Result<String, Error> {
+    let (len, stream) = stream.split_at_mut(mem::size_of::<u16>());
+
+    let len = &len[..];
+    let len = u16::from_be_bytes(len.try_into().unwrap());
+    let (topic, s) = stream.split_at_mut(len as usize);
+
+    match String::from_utf8(topic.to_vec()) {
+        Ok(v) => Ok(v),
+        Err(_e) => Err(Error::TopicNotUtf8)
+    }
+}
+
 fn read_mqtt_string(stream: &mut Bytes) -> Result<String, Error> {
     let len = stream.get_u16() as usize;
     let s = stream.split_to(len);
@@ -520,7 +548,6 @@ mod test {
                 topic: "a/b".to_owned(),
                 pkid: 10,
                 payload: Bytes::from(&payload[..]),
-                bytes
             }
         );
     }
@@ -556,7 +583,6 @@ mod test {
                 topic: "a/b".to_owned(),
                 pkid: 0,
                 payload: Bytes::from(&[0x01, 0x02][..]),
-                bytes
             }
         );
     }
