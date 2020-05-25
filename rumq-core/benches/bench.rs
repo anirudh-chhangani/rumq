@@ -31,7 +31,7 @@ fn stream(len: usize) -> Cursor<Vec<u8>> {
     let publish = Packet::Publish(publish);
     let mut payload = Vec::new();
     payload.mqtt_write(&publish).unwrap();
-    let mut extra = vec![0xDE, 0xAD, 0xBE, 0xEF]; // extra packets in the stream
+    let mut extra = vec![0xDE, 0xAD, 0xBE, 0xEF]; // extra control in the stream
 
     payload.append(&mut extra);
 

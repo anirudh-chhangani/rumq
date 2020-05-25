@@ -26,7 +26,7 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
     let control_type = packet_type(byte1 >> 4)?;
 
     if remaining_len == 0 {
-        // no payload packets
+        // no payload control
         return match control_type {
             PacketType::PingReq => Ok(Packet::PingReq),
             PacketType::PingResp => Ok(Packet::PingResp),
@@ -186,7 +186,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         // Reads till the end of connect packet leaving the extra bytes
@@ -212,7 +212,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -240,7 +240,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -253,7 +253,7 @@ mod test {
         };
 
         assert_eq!(packet.bytes.len(), packetstream.len() - 4);
-        // remove extra packets from source packet stream and compare
+        // remove extra control from source packet stream and compare
         packetstream.truncate(packetstream.len() - 4);
         assert_eq!(&packet.bytes[..], &packetstream[..]);
     }
@@ -274,7 +274,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -287,7 +287,7 @@ mod test {
         };
 
         assert_eq!(packet.bytes.len(), packetstream.len() - 4);
-        // remove extra packets from source packet stream and compare
+        // remove extra control from source packet stream and compare
         packetstream.truncate(packetstream.len() - 4);
         assert_eq!(&packet.bytes[..], &packetstream[..]);
     }
@@ -303,7 +303,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -345,7 +345,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -365,7 +365,7 @@ mod test {
             0x90, 4, // packet type, flags and remaining len
             0x00, 0x0F, // variable header. pkid = 15
             0x01, 0x80, // payload. return codes [success qos1, failure]
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -398,7 +398,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);

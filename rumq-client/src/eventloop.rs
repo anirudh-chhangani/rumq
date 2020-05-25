@@ -83,7 +83,7 @@ pub fn eventloop(options: MqttOptions, requests: impl Requests + 'static) -> Mqt
 impl MqttEventLoop {
     /// Connects to the broker and returns a stream that does everything MQTT.
     /// This stream internally processes requests from the request stream provided to the eventloop
-    /// while also consuming byte stream from the network and yielding mqtt packets as the output of
+    /// while also consuming byte stream from the network and yielding mqtt control as the output of
     /// the stream
     pub async fn connect<'eventloop>(&'eventloop mut self) -> Result<impl Stream<Item = Notification> + 'eventloop, EventLoopError> {
         self.state.await_pingresp = false;
@@ -482,7 +482,7 @@ mod test {
         let mut options = MqttOptions::new("dummy", "127.0.0.1", 2001);
         options.set_keep_alive(5);
 
-        // A broker which consumes packets but doesn't reply
+        // A broker which consumes control but doesn't reply
         task::spawn(async move {
             let mut broker = Broker::new(2001, true).await;
             broker.blackhole().await;

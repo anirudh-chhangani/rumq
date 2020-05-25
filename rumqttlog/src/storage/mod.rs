@@ -25,12 +25,7 @@ pub struct Log {
 }
 
 impl Log {
-    pub fn new<P: Into<PathBuf>>(
-        dir: P,
-        max_index_size: u64,
-        max_segment_size: u64,
-        max_segments: usize,
-    ) -> io::Result<Log> {
+    pub fn new<P: Into<PathBuf>>(dir: P, max_index_size: u64, max_segment_size: u64, max_segments: usize) -> io::Result<Log> {
         let dir = dir.into();
         let _ = fs::create_dir_all(&dir);
         if max_segment_size < 1024 || max_index_size < 100 {
@@ -54,20 +49,14 @@ impl Log {
             for base_offset in offsets.iter() {
                 let index = Index::new(&dir, *base_offset, max_index_size, false)?;
                 let segment = Segment::new(&dir, *base_offset)?;
-                let chunk = Chunk {
-                    index,
-                    segment,
-                };
+                let chunk = Chunk { index, segment };
                 chunks.insert(*base_offset, chunk);
             }
 
             // Initialize active segment
             let index = Index::new(&dir, *last_offset, max_index_size, true)?;
             let segment = Segment::new(&dir, *last_offset)?;
-            let mut chunk = Chunk {
-                index,
-                segment,
-            };
+            let mut chunk = Chunk { index, segment };
 
             // Wrong counts due to unclosed segments are handled during initialization. We can just assume
             // count is always right from here on
@@ -78,10 +67,7 @@ impl Log {
         } else {
             let index = Index::new(&dir, 0, max_index_size, true)?;
             let segment = Segment::new(&dir, 0)?;
-            let chunk = Chunk {
-                index,
-                segment,
-            };
+            let chunk = Chunk { index, segment };
             chunks.insert(0, chunk);
             base_offsets.push(0);
             0
@@ -115,10 +101,7 @@ impl Log {
             let base_offset = active_chunk.index.base_offset() + active_chunk.index.count();
             let index = Index::new(&self.dir, base_offset, self.max_index_size, true)?;
             let segment = Segment::new(&self.dir, base_offset)?;
-            let chunk = Chunk {
-                index,
-                segment,
-            };
+            let chunk = Chunk { index, segment };
             self.chunks.insert(base_offset, chunk);
             self.base_offsets.push(base_offset);
             self.active_chunk = base_offset;
@@ -213,7 +196,7 @@ impl Log {
         Ok(chunks)
     }
 
-    /// Reads multiple packets from the storage and return base offset and relative offset of the
+    /// Reads multiple control from the storage and return base offset and relative offset of the
     /// Returns base offset, relative offset of the last record along with number of messages and count
     /// Goes to next segment when relative off set crosses boundary
     pub fn readv(&mut self, base_offset: u64, relative_offset: u64, size: u64) -> io::Result<(u64, u64, u64, Vec<u8>)> {

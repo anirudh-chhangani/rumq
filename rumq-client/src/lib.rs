@@ -122,7 +122,7 @@ pub use state::MqttState;
 
 pub use rumq_core::mqtt4::*;
 
-/// Includes incoming packets from the network and other interesting events happening in the eventloop
+/// Includes incoming control from the network and other interesting events happening in the eventloop
 #[derive(Debug)]
 pub enum Notification {
     /// Incoming publish from the broker
@@ -251,7 +251,7 @@ pub struct MqttOptions {
     request_channel_capacity: usize,
     /// notification channel capacity
     notification_channel_capacity: usize,
-    /// Minimum delay time between consecutive outgoing packets
+    /// Minimum delay time between consecutive outgoing control
     throttle: Duration,
     /// maximum number of outgoing inflight messages
     inflight: usize,
@@ -364,7 +364,7 @@ impl MqttOptions {
     ///
     /// When set `false`, broker will hold the client state and performs pending
     /// operations on the client when reconnection with same `client_id`
-    /// happens. Local queue state is also held to retransmit packets after reconnection.
+    /// happens. Local queue state is also held to retransmit control after reconnection.
     pub fn set_clean_session(&mut self, clean_session: bool) -> &mut Self {
         self.clean_session = clean_session;
         self

@@ -88,7 +88,7 @@ impl MqttState {
         Ok((notification, request))
     }
 
-    /// Consolidates handling of all incoming mqtt packets. Returns a `Notification` which for the
+    /// Consolidates handling of all incoming mqtt control. Returns a `Notification` which for the
     /// user to consume and `Packet` which for the eventloop to put on the network
     /// E.g For incoming QoS1 publish packet, this method returns (Publish, Puback). Publish packet will
     /// be forwarded to user and Pubck packet will be written to network
@@ -112,7 +112,7 @@ impl MqttState {
         out
     }
 
-    /// Adds next packet identifier to QoS 1 and 2 publish packets and returns
+    /// Adds next packet identifier to QoS 1 and 2 publish control and returns
     /// it buy wrapping publish in packet
     fn handle_outgoing_publish(&mut self, publish: Publish) -> Result<Packet, StateError> {
         let publish = match publish.qos {
@@ -320,7 +320,7 @@ impl MqttState {
     /// TODO Measure Arc vs copy perf and take a call regarding clones
     fn add_packet_id_and_save(&mut self, mut publish: Publish) -> Publish {
         let publish = match publish.pkid {
-            // consider PacketIdentifier(0) and None as uninitialized packets
+            // consider PacketIdentifier(0) and None as uninitialized control
             Some(PacketIdentifier(0)) | None => {
                 let pkid = self.next_pkid();
                 publish.set_pkid(pkid);

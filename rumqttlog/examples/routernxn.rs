@@ -1,11 +1,11 @@
-use std::time::Instant;
-use rumqttlog::{channel, Router, Config, RouterInMessage, Sender, DataRequest, RouterOutMessage};
 use argh::FromArgs;
-use mqtt4bytes::*;
-use std::thread;
-use rumqttlog::router::Connection;
 use bytes::BytesMut;
 use futures_util::future::join_all;
+use mqtt4bytes::*;
+use rumqttlog::router::Connection;
+use rumqttlog::{channel, Config, DataRequest, Router, RouterInMessage, RouterOutMessage, Sender};
+use std::thread;
+use std::time::Instant;
 use tokio::task;
 
 pub mod common;
@@ -30,7 +30,7 @@ struct CommandLine {
     subscriber_count: usize,
 }
 
-#[tokio::main(core_threads=1)]
+#[tokio::main(core_threads = 1)]
 async fn main() {
     pretty_env_logger::init();
     let commandline: CommandLine = argh::from_env();
@@ -40,7 +40,7 @@ async fn main() {
         dir: Default::default(),
         max_segment_size: commandline.segment_size as u64,
         max_segment_count: 10000,
-        routers: None
+        routers: None,
     };
 
     let (router, tx) = Router::new(config);
@@ -65,14 +65,13 @@ async fn main() {
     common::report("read.pb", total_size as u64, start, guard);
 }
 
-
 #[tokio::main(core_threads = 1)]
 async fn start_router(mut router: Router) {
     router.start().await;
 }
 
 async fn write(commandline: &CommandLine, mut tx: Sender<(String, RouterInMessage)>) {
-    // 10K packets of 1K size each. 10M total data
+    // 10K control of 1K size each. 10M total data
     let data = vec![publish(commandline.payload_size); commandline.count];
     let guard = pprof::ProfilerGuard::new(100).unwrap();
     let start = Instant::now();
@@ -103,7 +102,7 @@ async fn read(commandline: &CommandLine, id: &str, mut tx: Sender<(String, Route
             topic: "hello/world".to_owned(),
             segment,
             offset,
-            size: commandline.sweep_size as u64
+            size: commandline.sweep_size as u64,
         };
 
         let message = (id.to_owned(), RouterInMessage::DataRequest(request));
@@ -128,4 +127,3 @@ pub fn publish(len: usize) -> Packet {
     publish.bytes = payload.freeze();
     Packet::Publish(publish)
 }
-

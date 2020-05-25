@@ -36,10 +36,7 @@ impl Log {
 
         let index = Index::new(0);
         let segment = Segment::new(0)?;
-        let chunk = Chunk {
-            index,
-            segment,
-        };
+        let chunk = Chunk { index, segment };
 
         chunks.insert(0, chunk);
         base_offsets.push(0);
@@ -71,10 +68,7 @@ impl Log {
             let base_offset = active_chunk.index.base_offset() + active_chunk.index.count();
             let index = Index::new(base_offset);
             let segment = Segment::new(base_offset)?;
-            let chunk = Chunk {
-                index,
-                segment,
-            };
+            let chunk = Chunk { index, segment };
 
             self.chunks.insert(base_offset, chunk);
             self.base_offsets.push(base_offset);
@@ -170,15 +164,10 @@ impl Log {
         Ok((done, chunks))
     }
 
-    /// Reads multiple packets from the storage and return base offset and relative offset of the
+    /// Reads multiple control from the storage and return base offset and relative offset of the
     /// Returns base offset, relative offset of the last record along with number of messages and count
     /// Goes to next segment when relative off set crosses boundary
-    pub fn readv(
-        &mut self,
-        segment: u64,
-        offset: u64,
-        size: u64,
-    ) -> io::Result<(bool, u64, u64, u64, Vec<u16>, Vec<Bytes>)> {
+    pub fn readv(&mut self, segment: u64, offset: u64, size: u64) -> io::Result<(bool, u64, u64, u64, Vec<u16>, Vec<Bytes>)> {
         let (done, chunks) = self.indexv(segment, offset, size)?;
         let mut out = Vec::new();
 

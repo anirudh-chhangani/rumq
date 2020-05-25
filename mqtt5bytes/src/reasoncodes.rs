@@ -9,7 +9,7 @@ impl ReasonCode {
     pub const DISCONNECT_WITH_WILL: u8 = 4;
     pub const NO_MATCHING_SUBSCRIBERS: u8 = 16;
     pub const NO_SUBSCRIPTION_EXISTED: u8 = 17;
-    pub const CONTINUE_AUTH: u8 = 24;
+    pub const CONTINUE_AUTHENTICATION: u8 = 24;
     pub const RE_AUTHENTICATE: u8 = 25;
     pub const UNSPECIFIED_ERROR: u8 = 128;
     pub const MALFORMED_PACKET: u8 = 129;

@@ -16,7 +16,7 @@ pub trait AsyncMqttRead: AsyncReadExt + Unpin {
         let kind = packet_type(byte1 >> 4)?;
 
         if remaining_len == 0 {
-            // no payload packets
+            // no payload control
             return match kind {
                 PacketType::Pingreq => Ok(Packet::Pingreq),
                 PacketType::Pingresp => Ok(Packet::Pingresp),
@@ -284,7 +284,7 @@ mod test {
             'e' as u8, // payload. variable header. will msg = 'offline'
             0x00, 0x04, 'r' as u8, 'u' as u8, 'm' as u8, 'q' as u8, // payload. username = 'rumq'
             0x00, 0x02, 'm' as u8, 'q' as u8, // payload. password = 'mq'
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();
@@ -313,7 +313,7 @@ mod test {
         let mut stream = Cursor::new(vec![
             0b00100000, 0x02, // packet type, flags and remaining len
             0x01, 0x00, // variable header. connack flags, connect return code
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
         let packet = stream.async_mqtt_read().await.unwrap();
 
@@ -333,7 +333,7 @@ mod test {
             0x00, 0x03, 'a' as u8, '/' as u8, 'b' as u8, // variable header. topic name = 'a/b'
             0x00, 0x0a, // variable header. pkid = 10
             0xF1, 0xF2, 0xF3, 0xF4, // publish payload
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();
@@ -357,7 +357,7 @@ mod test {
             0b00110000, 7, // packet type, flags and remaining len
             0x00, 0x03, 'a' as u8, '/' as u8, 'b' as u8, // variable header. topic name = 'a/b'
             0x01, 0x02, // payload
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();
@@ -380,7 +380,7 @@ mod test {
         let mut stream = Cursor::new(vec![
             0b01000000, 0x02, // packet type, flags and remaining len
             0x00, 0x0A, // fixed header. packet identifier = 10
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
         let packet = stream.async_mqtt_read().await.unwrap();
 
@@ -398,7 +398,7 @@ mod test {
             0x01,      // payload. qos = 1
             0x00, 0x05, 'a' as u8, '/' as u8, 'b' as u8, '/' as u8, 'c' as u8, // payload. topic filter = 'a/b/c'
             0x02,      // payload. qos = 2
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();
@@ -433,7 +433,7 @@ mod test {
             0x00, 0x03, 'a' as u8, '/' as u8, '+' as u8, // payload. topic filter = 'a/+'
             0x00, 0x01, '#' as u8, // pyaload. topic filter = '#'
             0x00, 0x05, 'a' as u8, '/' as u8, 'b' as u8, '/' as u8, 'c' as u8, // payload. topic filter = 'a/b/c'
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();
@@ -453,7 +453,7 @@ mod test {
             0x90, 4, // packet type, flags and remaining len
             0x00, 0x0F, // variable header. pkid = 15
             0x01, 0x80, // payload. return codes [success qos1, failure]
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ]);
 
         let packet = stream.async_mqtt_read().await.unwrap();

@@ -44,7 +44,7 @@ There is 8X improvement in throughput
 ```rust
 // https://docs.rs/tokio/0.2.6/src/tokio/io/util/buf_reader.rs.html#117
 // TODO What happens when socket receives only 4K of data and there is no new data?
-// TODO Also might have to periodically flush to send mqtt packets which are part of
+// TODO Also might have to periodically flush to send mqtt control which are part of
 // partially filled write bufers 
 let mut stream = BufStream::new(&mut self.stream);
 ```

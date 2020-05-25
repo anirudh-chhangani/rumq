@@ -1,7 +1,7 @@
 use crate::mqtt4::QoS;
 use std::fmt;
 
-/// Packet identifier for packets types that require broker to acknowledge
+/// Packet identifier for control types that require broker to acknowledge
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PacketIdentifier(pub u16);
 

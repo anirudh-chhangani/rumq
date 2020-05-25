@@ -77,7 +77,7 @@ impl MqttState {
         }
     }
 
-    /// Consolidates handling of all incoming mqtt packets. Returns a `Packet` which for the
+    /// Consolidates handling of all incoming mqtt control. Returns a `Packet` which for the
     /// user to consume and `Packet` which for the eventloop to put on the network
     /// E.g For incoming QoS1 publish packet, this method returns (Publish, Puback). Publish packet will
     /// be forwarded to user and Pubck packet will be written to network
@@ -95,7 +95,7 @@ impl MqttState {
         out
     }
 
-    /// Adds next packet identifier to QoS 1 and 2 publish packets and returns
+    /// Adds next packet identifier to QoS 1 and 2 publish control and returns
     /// it buy wrapping publish in packet
     pub fn handle_outgoing_publish(&mut self, publish: Publish) -> Packet {
         let publish = match publish.qos {
@@ -173,7 +173,11 @@ impl MqttState {
             };
 
             let topic = &topic.topic_path;
-            let code = if valid_filter(topic) { SubscribeReturnCodes::Success(qos) } else { SubscribeReturnCodes::Failure };
+            let code = if valid_filter(topic) {
+                SubscribeReturnCodes::Success(qos)
+            } else {
+                SubscribeReturnCodes::Failure
+            };
 
             // add only successful subscriptions to router message
             if let SubscribeReturnCodes::Success(qos) = code {

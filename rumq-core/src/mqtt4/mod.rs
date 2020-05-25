@@ -44,7 +44,7 @@ enum PacketType {
     Disconnect,
 }
 
-/// Encapsulates all the possible mqtt packets
+/// Encapsulates all the possible mqtt control
 #[derive(Debug, Clone, PartialEq)]
 pub enum Packet {
     Connect(Connect),

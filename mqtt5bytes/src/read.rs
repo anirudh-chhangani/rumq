@@ -1,5 +1,8 @@
-use crate::packetbytes::*;
-use crate::{packet_type, Error, FixedHeader, PacketType};
+use crate::enums::Packet;
+use crate::{
+    packet_type, ConnAck, Connect, Error, FixedHeader, PacketType, PubAck, PubComp, PubRec, PubRel, Publish, SubAck, Subscribe,
+    UnSubAck, Unsubscribe,
+};
 use bytes::BytesMut;
 
 pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packet, Error> {
@@ -26,7 +29,7 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
     let control_type = packet_type(byte1 >> 4)?;
 
     if remaining_len == 0 {
-        // no payload packets
+        // no payload control
         return match control_type {
             PacketType::PingReq => Ok(Packet::PingReq),
             PacketType::PingResp => Ok(Packet::PingResp),
@@ -58,7 +61,7 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
         PacketType::Subscribe => Packet::Subscribe(Subscribe::assemble(fixed_header, packet)?),
         PacketType::SubAck => Packet::SubAck(SubAck::assemble(fixed_header, packet)?),
         PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::assemble(fixed_header, packet)?),
-        PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::assemble(fixed_header, packet)?),
+        PacketType::UnsubAck => Packet::UnsubAck(UnSubAck::assemble(fixed_header, packet)?),
         PacketType::PingReq => Packet::PingReq,
         PacketType::PingResp => Packet::PingResp,
         PacketType::Disconnect => Packet::Disconnect,
@@ -187,7 +190,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         // Reads till the end of connect packet leaving the extra bytes
@@ -213,7 +216,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -241,7 +244,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -254,7 +257,7 @@ mod test {
         };
 
         assert_eq!(packet.bytes.len(), packetstream.len() - 4);
-        // remove extra packets from source packet stream and compare
+        // remove extra control from source packet stream and compare
         packetstream.truncate(packetstream.len() - 4);
         assert_eq!(&packet.bytes[..], &packetstream[..]);
     }
@@ -275,7 +278,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -288,7 +291,7 @@ mod test {
         };
 
         assert_eq!(packet.bytes.len(), packetstream.len() - 4);
-        // remove extra packets from source packet stream and compare
+        // remove extra control from source packet stream and compare
         packetstream.truncate(packetstream.len() - 4);
         assert_eq!(&packet.bytes[..], &packetstream[..]);
     }
@@ -304,7 +307,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -346,7 +349,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -366,7 +369,7 @@ mod test {
             0x90, 4, // packet type, flags and remaining len
             0x00, 0x0F, // variable header. pkid = 15
             0x01, 0x80, // payload. return codes [success qos1, failure]
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);
@@ -399,7 +402,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream);

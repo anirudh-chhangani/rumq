@@ -88,7 +88,14 @@ impl<S: Network> Connection<S> {
         // construct connect router message with cliend id and handle to this connection
         let routermessage = RouterMessage::Connect(router::Connection::new(connect, this_tx));
         router_tx.send((id.clone(), routermessage)).await?;
-        let connection = Connection { config, id, keep_alive, stream, this_rx, router_tx };
+        let connection = Connection {
+            config,
+            id,
+            keep_alive,
+            stream,
+            this_rx,
+            router_tx,
+        };
         Ok(connection)
     }
 
@@ -109,7 +116,7 @@ impl<S: Network> Connection<S> {
             _ => return Err(Error::NotConnack),
         };
 
-        // eventloop which pending packets from the last session
+        // eventloop which pending control from the last session
         if pending.len() > 0 {
             let connack = Connack::new(ConnectReturnCode::Accepted, true);
             let packet = Packet::Connack(connack);
@@ -137,7 +144,7 @@ impl<S: Network> Connection<S> {
             self.stream.send(packet).await?;
         }
 
-        // eventloop which processes packets and router messages
+        // eventloop which processes control and router messages
         let mut incoming = &mut self.stream;
         let mut incoming = time::throttle(Duration::from_millis(self.config.throttle_delay_ms), &mut incoming);
 
@@ -160,7 +167,7 @@ impl<S: Network> Connection<S> {
 use tokio::time::Delay;
 use tokio::time::Throttle;
 
-/// selects incoming packets from the network stream and router message stream
+/// selects incoming control from the network stream and router message stream
 /// Forwards router messages to network
 /// bool field can be used to instruct outer loop to stop processing messages
 async fn select<S: Network>(

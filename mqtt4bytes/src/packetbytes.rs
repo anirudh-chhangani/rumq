@@ -378,7 +378,7 @@ impl UnsubAck {
 
 fn read_mqtt_string(stream: &mut Bytes) -> Result<String, Error> {
     let len = stream.get_u16() as usize;
-    // Invalid packets which reached this point (simulated invalid packets actually triggered this)
+    // Invalid control which reached this point (simulated invalid control actually triggered this)
     // should not cause the split to cross boundaries
     if len > stream.len() {
         return Err(Error::BoundaryCrossed);
@@ -459,7 +459,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream[..]);
@@ -499,7 +499,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         stream.extend_from_slice(&packetstream[..]);
@@ -537,7 +537,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
 
         let bytes = &[
@@ -595,7 +595,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
         let bytes = &[
             0b0011_0000,
@@ -641,7 +641,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
         let mut stream = BytesMut::from(&stream[..]);
 
@@ -682,7 +682,7 @@ mod test {
             0xDE,
             0xAD,
             0xBE,
-            0xEF, // extra packets in the stream
+            0xEF, // extra control in the stream
         ];
         let mut stream = BytesMut::from(&stream[..]);
 
@@ -720,7 +720,7 @@ mod test {
             0x90, 4, // packet type, flags and remaining len
             0x00, 0x0F, // variable header. pkid = 15
             0x01, 0x80, // payload. return codes [success qos1, failure]
-            0xDE, 0xAD, 0xBE, 0xEF, // extra packets in the stream
+            0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ];
         let mut stream = BytesMut::from(&stream[..]);
 

@@ -1,4 +1,19 @@
+use crate::QoS;
+use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt;
+
+#[derive(Clone, PartialEq)]
+pub struct SubscribeTopic {
+    pub topic_path: String,
+    pub qos: QoS,
+}
+
+impl fmt::Debug for SubscribeTopic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Filter = {}, Qos = {:?}", self.topic_path, self.qos)
+    }
+}
 
 // checks if a topic or topic filter has wildcards
 pub fn has_wildcards(s: &str) -> bool {
