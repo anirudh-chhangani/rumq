@@ -27,7 +27,7 @@ use crate::{Error, QoS};
 use alloc::string::String;
 use bytes::{Buf, Bytes};
 
-pub fn qos(num: u8) -> Result<QoS, Error> {
+pub(crate) fn qos(num: u8) -> Result<QoS, Error> {
     match num {
         0 => Ok(QoS::AtMostOnce),
         1 => Ok(QoS::AtLeastOnce),
@@ -37,7 +37,7 @@ pub fn qos(num: u8) -> Result<QoS, Error> {
 }
 
 // extract methods
-pub fn extract_mqtt_string(stream: &mut Bytes) -> Result<String, Error> {
+pub(crate) fn extract_mqtt_string(stream: &mut Bytes) -> Result<String, Error> {
     let len = stream.get_u16() as usize;
     // Invalid control which reached this point (simulated invalid control actually triggered this)
     // should not cause the split to cross boundaries
