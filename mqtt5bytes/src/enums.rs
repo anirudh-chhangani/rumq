@@ -1,14 +1,4 @@
-use crate::ConnAck;
-use crate::Connect;
-use crate::PubAck;
-use crate::PubComp;
-use crate::PubRec;
-use crate::PubRel;
-use crate::Publish;
-use crate::SubAck;
-use crate::Subscribe;
-use crate::UnSubAck;
-use crate::Unsubscribe;
+use crate::control::*;
 
 #[derive(Debug, Clone)]
 pub enum Packet {
@@ -22,11 +12,11 @@ pub enum Packet {
     Subscribe(Subscribe),
     SubAck(SubAck),
     Unsubscribe(Unsubscribe),
-    UnsubAck(UnSubAck),
+    UnsubAck(UnsubAck),
     PingReq,
     PingResp,
-    Disconnect,
-    Auth,
+    Disconnect(Disconnect),
+    Auth(Auth),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

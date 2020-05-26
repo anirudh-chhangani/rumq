@@ -1,5 +1,7 @@
+mod auth;
 mod connack;
 mod connect;
+mod disconnect;
 mod puback;
 mod pubcomp;
 mod publish;
@@ -11,8 +13,10 @@ mod unsuback;
 mod unsubscribe;
 
 // Re-Exports
+pub use self::auth::Auth;
 pub use self::connack::ConnAck;
 pub use self::connect::Connect;
+pub use self::disconnect::Disconnect;
 pub use self::puback::PubAck;
 pub use self::pubcomp::PubComp;
 pub use self::publish::Publish;
@@ -20,7 +24,7 @@ pub use self::pubrec::PubRec;
 pub use self::pubrel::PubRel;
 pub use self::suback::SubAck;
 pub use self::subscribe::Subscribe;
-pub use self::unsuback::UnSubAck;
+pub use self::unsuback::UnsubAck;
 pub use self::unsubscribe::Unsubscribe;
 
 use crate::{Error, QoS};

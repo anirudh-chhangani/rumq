@@ -47,3 +47,16 @@ impl ReasonCode {
     pub const SUBSCRIPTION_ID_UNSUPPORTED: u8 = 161;
     pub const WILDCARD_SUBSCRIPTION_NOT_SUPPORTED: u8 = 162;
 }
+
+#[cfg(test)]
+mod test_reason_code {
+    use crate::reasoncodes::ReasonCode;
+
+    #[test]
+    fn reason_code_assertion() {
+        let reason_code: ReasonCode;
+        let value1: u8 = 159;
+        assert_eq!(value1, ReasonCode::CONNECTION_RATE_EXCEEDED);
+        assert_ne!(value1, ReasonCode::WILDCARD_SUBSCRIPTION_NOT_SUPPORTED);
+    }
+}

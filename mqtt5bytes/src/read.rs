@@ -1,8 +1,6 @@
+use crate::control::*;
 use crate::enums::Packet;
-use crate::{
-    packet_type, ConnAck, Connect, Error, FixedHeader, PacketType, PubAck, PubComp, PubRec, PubRel, Publish, SubAck, Subscribe,
-    UnSubAck, Unsubscribe,
-};
+use crate::{packet_type, Error, FixedHeader, PacketType};
 use bytes::BytesMut;
 
 pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packet, Error> {
@@ -33,7 +31,6 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
         return match control_type {
             PacketType::PingReq => Ok(Packet::PingReq),
             PacketType::PingResp => Ok(Packet::PingResp),
-            PacketType::Disconnect => Ok(Packet::Disconnect),
             _ => Err(Error::PayloadRequired),
         };
     }
@@ -61,11 +58,11 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
         PacketType::Subscribe => Packet::Subscribe(Subscribe::assemble(fixed_header, packet)?),
         PacketType::SubAck => Packet::SubAck(SubAck::assemble(fixed_header, packet)?),
         PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::assemble(fixed_header, packet)?),
-        PacketType::UnsubAck => Packet::UnsubAck(UnSubAck::assemble(fixed_header, packet)?),
+        PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::assemble(fixed_header, packet)?),
         PacketType::PingReq => Packet::PingReq,
         PacketType::PingResp => Packet::PingResp,
-        PacketType::Disconnect => Packet::Disconnect,
-        PacketType::Auth => Packet::Auth,
+        PacketType::Disconnect => Packet::Disconnect(Disconnect::assemble(fixed_header, packet)?),
+        PacketType::Auth => Packet::Auth(Auth::assemble(fixed_header, packet)?),
     };
 
     Ok(packet)
