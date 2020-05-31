@@ -1,5 +1,7 @@
 pub struct ReasonCode;
 
+/// The CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, DISCONNECT and AUTH Control Packets have a single Reason Code as part of the Variable Header.
+/// The SUBACK and UNSUBACK packets contain a list of one or more Reason Codes in the Payload.
 impl ReasonCode {
     pub const SUCCESS: u8 = 0;
     pub const NORMAL_DISCONNECT: u8 = 0;

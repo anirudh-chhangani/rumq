@@ -19,17 +19,6 @@ pub enum Packet {
     Auth(Auth),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[repr(u8)]
-pub enum ConnectReturnCode {
-    Accepted = 0,
-    RefusedProtocolVersion,
-    RefusedIdentifierRejected,
-    ServerUnavailable,
-    BadUsernamePassword,
-    NotAuthorized,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SubscribeReturnCodes {
     Success(QoS),

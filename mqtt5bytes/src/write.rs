@@ -54,7 +54,7 @@ pub fn mqtt_write(packet: Packet, payload: &mut BytesMut) -> Result<(), Error> {
         Packet::ConnAck(packet) => {
             payload.reserve(4);
             let session_present = packet.session_present as u8;
-            let code = packet.code as u8;
+            let code = packet.reason_code as u8;
             payload.put_u8(0x20);
             payload.put_u8(0x02);
             payload.put_u8(session_present);
@@ -172,13 +172,10 @@ pub fn mqtt_write(packet: Packet, payload: &mut BytesMut) -> Result<(), Error> {
             payload.put_u8(0);
             Ok(())
         }
-        Packet::Disconnect => {
-            payload.reserve(2);
-            let o: &[u8] = &[0xe0, 0];
-            payload.put_slice(o);
+        Packet::Disconnect(packet) => {
             Ok(())
         }
-        Packet::Auth => Ok(()),
+        Packet::Auth(packet) => Ok(()),
     }
 }
 
@@ -214,6 +211,7 @@ mod test {
     use alloc::borrow::ToOwned;
     use alloc::vec;
     use bytes::{Bytes, BytesMut};
+    use crate::reasoncodes::ReasonCode;
 
     #[test]
     fn write_packet_connect_mqtt_protocol_works() {
@@ -287,7 +285,8 @@ mod test {
     fn write_packet_connack_works() {
         let connack = Packet::ConnAck(ConnAck {
             session_present: true,
-            code: ConnectReturnCode::Accepted,
+            reason_code: ReasonCode::SUCCESS,
+            properties: None
         });
 
         let mut buf = BytesMut::new();

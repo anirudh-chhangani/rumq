@@ -68,6 +68,7 @@ impl Connect {
 
 impl Connect {
     pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Connect, Error> {
+
         let extract_last_will = |connect_flags: u8, mut bytes: &mut Bytes| -> Result<Option<LastWill>, Error> {
             let last_will = match connect_flags & 0b100 {
                 0 if (connect_flags & 0b0011_1000) != 0 => {
@@ -160,7 +161,7 @@ mod test_connect {
     #[test]
     fn connect_stitching_works_correctly() {
         let mut stream = bytes::BytesMut::new();
-        let packetstream = &[
+        let packet_stream = &[
             0x10,
             39, // packet type, flags and remaining len
             0x00,
@@ -208,7 +209,7 @@ mod test_connect {
             0xEF, // extra control in the stream
         ];
 
-        stream.extend_from_slice(&packetstream[..]);
+        stream.extend_from_slice(&packet_stream[..]);
         let packet = mqtt_read(&mut stream, 100).unwrap();
         let packet = match packet {
             Packet::Connect(connect) => connect,

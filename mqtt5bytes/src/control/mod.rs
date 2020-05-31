@@ -13,19 +13,19 @@ mod unsuback;
 mod unsubscribe;
 
 // Re-Exports
-pub use self::auth::Auth;
-pub use self::connack::ConnAck;
-pub use self::connect::Connect;
-pub use self::disconnect::Disconnect;
-pub use self::puback::PubAck;
-pub use self::pubcomp::PubComp;
-pub use self::publish::Publish;
-pub use self::pubrec::PubRec;
-pub use self::pubrel::PubRel;
-pub use self::suback::SubAck;
-pub use self::subscribe::Subscribe;
-pub use self::unsuback::UnsubAck;
-pub use self::unsubscribe::Unsubscribe;
+pub use self::auth::*;
+pub use self::connack::*;
+pub use self::connect::*;
+pub use self::disconnect::*;
+pub use self::puback::*;
+pub use self::pubcomp::*;
+pub use self::publish::*;
+pub use self::pubrec::*;
+pub use self::pubrel::*;
+pub use self::suback::*;
+pub use self::subscribe::*;
+pub use self::unsuback::*;
+pub use self::unsubscribe::*;
 
 use crate::{Error, QoS};
 use alloc::string::String;
