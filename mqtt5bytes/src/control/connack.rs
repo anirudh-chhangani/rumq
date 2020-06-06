@@ -1,33 +1,11 @@
-use crate::{Error, FixedHeader};
+use crate::{Error, FixedHeader, ByteLengths};
 use bytes::{Buf, Bytes};
 use crate::reasoncodes::ReasonCode;
 use alloc::string::String;
-
-struct PropertyIdentifiers;
-
-impl PropertyIdentifiers {
-    const SESSION_EXPIRY_INTERVAL: u8 = 17;
-    const RECEIVE_MAXIMUM: u8 = 33;
-    const MAXIMUM_QOS: u8 = 36;
-    const RETAIN_AVAILABLE: u8 = 37;
-    const MAXIMUM_PACKET_SIZE: u8 = 39;
-    const ASSIGNED_CLIENT_IDENTIFIER: u8 = 18;
-    const TOPIC_ALIAS_MAXIMUM: u8 = 34;
-    const REASON_STRING: u8 = 31;
-    const USER_PROPERTY: u8 = 38;
-    const WILDCARD_SUBSCRIPTION_AVAILABLE: u8 = 40;
-    const SUBSCRIPTION_IDENTIFIER_AVAILABLE: u8 = 41;
-    const SHARED_SUBSCRIPTION_AVAILABLE: u8 = 42;
-    const SERVER_KEEP_ALIVE: u8 = 19;
-    const RESPONSE_INFO: u8 = 26;
-    const SERVER_INFO: u8 = 28;
-    const AUTHENTICATION_METHOD: u8 = 21;
-    const AUTHENTICATION_DATA: u8 = 22;
-}
-
+use crate::control::properties::{PropertyIdentifiers, Properties, extract_properties};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Properties {
+pub struct ConnackProperties {
     pub session_expiry_interval: Option<u32>,
     pub assigned_client_identifier: Option<String>,
     pub server_keep_alive: Option<u16>,
@@ -51,8 +29,9 @@ pub struct Properties {
 pub struct ConnAck {
     pub session_present: bool,
     pub reason_code: u8,
-    pub properties: Option<Properties>,
+    pub properties: Option<ConnackProperties>,
 }
+
 
 impl ConnAck {
     pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Self, Error> {
@@ -68,88 +47,44 @@ impl ConnAck {
 
         let reason_code = bytes.get_u8();
 
-        let prop_length: u8 = bytes.get_u8();
+        let _props = extract_properties(&mut bytes)?;
 
-// get properties if avail
-        let mut properties: Option<Properties> = None;
-
-        if prop_length > 0 {
-            let mut session_expiry_interval: Option<u32> = None;
-            let mut assigned_client_identifier: Option<String> = None;
-            let mut server_keep_alive: Option<u16> = None;
-            let mut authentication_method: Option<String> = None;
-            let mut authentication_data = None;
-            let mut response_info = None;
-            let mut server_info = None;
-            let mut reason_string = None;
-            let mut user_property = None;
-            let mut receive_maximum = None;
-            let mut topic_alias_maximum = None;
-            let mut maximum_qos = None;
-            let mut retain_available = None;
-            let mut maximum_packet_size = None;
-            let mut wildcard_subscription_available = None;
-            let mut subscription_identifier_available = None;
-            let mut shared_subscription_available = None;
-
-            // WIP : parse loop for properties
-            {
-                let ident = bytes.get_u8();
-                // match identifier to extract properties
-                match ident {
-                    PropertyIdentifiers::SESSION_EXPIRY_INTERVAL => {
-                        session_expiry_interval = Some(bytes.get_u32());
+        let connack = match _props {
+            Some(props) => {
+                let properties = Some(
+                    ConnackProperties {
+                        session_expiry_interval: props.session_expiry_interval,
+                        assigned_client_identifier: props.assigned_client_identifier,
+                        server_keep_alive: props.server_keep_alive,
+                        authentication_method: props.authentication_method,
+                        authentication_data: props.authentication_data,
+                        response_info: props.response_info,
+                        server_info: props.server_info,
+                        reason_string: props.reason_string,
+                        user_property: props.user_property,
+                        receive_maximum: props.receive_maximum,
+                        topic_alias_maximum: props.topic_alias_maximum,
+                        maximum_qos: props.maximum_qos,
+                        retain_available: props.retain_available,
+                        maximum_packet_size: props.maximum_packet_size,
+                        wildcard_subscription_available: props.wildcard_subscription_available,
+                        subscription_identifier_available: props.subscription_identifier_available,
+                        shared_subscription_available: props.shared_subscription_available,
                     }
-                    PropertyIdentifiers::RECEIVE_MAXIMUM => {
-                    }
-                    PropertyIdentifiers::MAXIMUM_QOS => {}
-                    PropertyIdentifiers::RETAIN_AVAILABLE => {}
-                    PropertyIdentifiers::MAXIMUM_PACKET_SIZE => {}
-                    PropertyIdentifiers::ASSIGNED_CLIENT_IDENTIFIER => {}
-                    PropertyIdentifiers::TOPIC_ALIAS_MAXIMUM => {}
-                    PropertyIdentifiers::REASON_STRING => {}
-                    PropertyIdentifiers::USER_PROPERTY => {}
-                    PropertyIdentifiers::WILDCARD_SUBSCRIPTION_AVAILABLE => {}
-                    PropertyIdentifiers::SUBSCRIPTION_IDENTIFIER_AVAILABLE => {}
-                    PropertyIdentifiers::SHARED_SUBSCRIPTION_AVAILABLE => {}
-                    PropertyIdentifiers::SERVER_KEEP_ALIVE => {}
-                    PropertyIdentifiers::RESPONSE_INFO => {}
-                    PropertyIdentifiers::SERVER_INFO => {}
-                    PropertyIdentifiers::AUTHENTICATION_METHOD => {}
-                    PropertyIdentifiers::AUTHENTICATION_DATA => {}
-                    _ => {}
-                }
+                );
+
+                ConnAck { session_present, reason_code, properties }
             }
+            None => ConnAck { session_present, reason_code, properties: None }
 
-            Properties {
-                session_expiry_interval,
-                assigned_client_identifier,
-                server_keep_alive,
-                authentication_method,
-                authentication_data,
-                response_info,
-                server_info,
-                reason_string,
-                user_property,
-                receive_maximum,
-                topic_alias_maximum,
-                maximum_qos,
-                retain_available,
-                maximum_packet_size,
-                wildcard_subscription_available,
-                subscription_identifier_available,
-                shared_subscription_available,
-            };
-        }
-
-        let connack = ConnAck { session_present, reason_code, properties };
+        };
 
         Ok(connack)
     }
 }
 
 impl ConnAck {
-    pub fn new(reason_code: u8, session_present: bool, properties: Option<Properties>) -> ConnAck {
+    pub fn new(reason_code: u8, session_present: bool, properties: Option<ConnackProperties>) -> ConnAck {
         ConnAck { session_present, reason_code, properties }
     }
 }

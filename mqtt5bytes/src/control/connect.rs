@@ -2,6 +2,20 @@ use crate::{extract_mqtt_string, qos, Error, FixedHeader, LastWill, Protocol};
 use alloc::string::String;
 use bytes::{Buf, Bytes};
 use core::fmt;
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConnectProperties {
+    pub session_expiry_interval: Option<u32>,
+    pub receive_maximum: Option<u16>,
+    pub maximum_packet_size: Option<u32>,
+    pub topic_alias_maximum: Option<u16>,
+    pub request_response_information: Option<u8>,
+    pub request_problem_information: Option<u8>,
+    pub user_property: Option<String>,
+    pub authentication_methods: Option<String>,
+    pub authentication_data: Option<String>,
+}
 
 #[derive(Clone, PartialEq)]
 pub struct Connect {
@@ -19,6 +33,8 @@ pub struct Connect {
     pub username: Option<String>,
     /// Password of the client
     pub password: Option<String>,
+    /// Connect properties
+    pub properties: Option<ConnectProperties>,
 }
 
 impl Connect {
@@ -31,6 +47,7 @@ impl Connect {
             last_will: None,
             username: None,
             password: None,
+            properties: None
         }
     }
 
@@ -126,14 +143,44 @@ impl Connect {
         let last_will = extract_last_will(connect_flags, &mut bytes)?;
         let (username, password) = extract_username_password(connect_flags, &mut bytes)?;
 
-        let connect = Connect {
-            protocol,
-            keep_alive,
-            client_id,
-            clean_session,
-            last_will,
-            username,
-            password,
+        let _props = extract_properties(&mut bytes)?;
+
+        let connect = match _props {
+            Some(props) => {
+                let properties = Some(
+                    ConnectProperties{
+                        session_expiry_interval: props.session_expiry_interval,
+                        receive_maximum: props.receive_maximum,
+                        maximum_packet_size: props.maximum_packet_size,
+                        topic_alias_maximum: props.topic_alias_maximum,
+                        request_response_information: props.request_response_info,
+                        request_problem_information: props.request_problem_info,
+                        user_property: props.user_property,
+                        authentication_methods: props.authentication_method,
+                        authentication_data: props.authentication_data
+                    }
+                );
+                Connect {
+                    protocol,
+                    keep_alive,
+                    client_id,
+                    clean_session,
+                    last_will,
+                    username,
+                    password,
+                    properties
+                }
+            }
+            None => Connect {
+                protocol,
+                keep_alive,
+                client_id,
+                clean_session,
+                last_will,
+                username,
+                password,
+                properties: None
+            }
         };
 
         Ok(connect)
@@ -231,6 +278,7 @@ mod test_connect {
                 }),
                 username: Some("rumq".to_owned()),
                 password: Some("mq".to_owned()),
+                properties: None
             }
         );
     }

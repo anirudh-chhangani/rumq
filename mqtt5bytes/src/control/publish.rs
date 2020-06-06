@@ -3,6 +3,19 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
 use core::fmt;
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublishProperties {
+    pub payload_format_indicator: Option<u8>,
+    pub message_expiry_interval: Option<u32>,
+    pub topic_alias: Option<u16>,
+    pub response_topic: Option<String>,
+    pub correlation_data: Option<String>,
+    pub user_property: Option<String>,
+    pub subscription_identifier: Option<u32>,
+    pub content_type: Option<String>,
+}
 
 #[derive(Clone, PartialEq)]
 pub struct Publish {
@@ -13,10 +26,11 @@ pub struct Publish {
     pub dup: bool,
     pub retain: bool,
     pub bytes: Bytes,
+    pub properties: Option<PublishProperties>,
 }
 
 impl Publish {
-    pub(crate) fn assemble(fixed_header: FixedHeader, bytes: Bytes) -> Result<Self, Error> {
+    pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Self, Error> {
         let mut payload = bytes.clone();
         let qos = qos((fixed_header.byte1 & 0b0110) >> 1)?;
         let dup = (fixed_header.byte1 & 0b1000) != 0;
@@ -36,14 +50,44 @@ impl Publish {
             return Err(Error::PacketIdZero);
         }
 
-        let publish = Publish {
-            qos,
-            pkid,
-            topic,
-            payload,
-            dup,
-            retain,
-            bytes,
+        let _props = extract_properties(&mut bytes)?;
+
+        let publish = match _props {
+            Some(props) => {
+                let properties = Some(
+                    PublishProperties {
+                        payload_format_indicator: props.payload_format_indicator,
+                        message_expiry_interval: props.message_expiry_interval,
+                        topic_alias: props.topic_alias,
+                        response_topic: props.response_topic,
+                        correlation_data: props.correlation_data,
+                        user_property: props.user_property,
+                        subscription_identifier: props.subscription_identifier,
+                        content_type: props.content_type,
+                    }
+                );
+
+                Publish {
+                    qos,
+                    pkid,
+                    topic,
+                    payload,
+                    dup,
+                    retain,
+                    bytes,
+                    properties,
+                }
+            }
+            None => Publish {
+                qos,
+                pkid,
+                topic,
+                payload,
+                dup,
+                retain,
+                bytes,
+                properties: None,
+            }
         };
 
         Ok(publish)
@@ -61,6 +105,7 @@ impl Publish {
             topic: topic.into(),
             payload: bytes::Bytes::from(payload.into()),
             bytes: Bytes::new(),
+            properties: None,
         }
     }
 
@@ -150,6 +195,7 @@ mod test_publish {
                 pkid: 10,
                 payload: Bytes::from(&payload[..]),
                 bytes,
+                properties: None,
             }
         );
     }
@@ -201,6 +247,7 @@ mod test_publish {
                 pkid: 0,
                 payload: Bytes::from(&[0x01, 0x02][..]),
                 bytes,
+                properties: None,
             }
         );
     }

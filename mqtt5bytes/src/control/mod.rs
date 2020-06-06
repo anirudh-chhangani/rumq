@@ -11,6 +11,7 @@ mod suback;
 mod subscribe;
 mod unsuback;
 mod unsubscribe;
+mod properties;
 
 // Re-Exports
 pub use self::auth::*;
@@ -54,4 +55,37 @@ pub(crate) fn extract_mqtt_string(stream: &mut Bytes) -> Result<String, Error> {
         Ok(v) => Ok(v),
         Err(_e) => Err(Error::TopicNotUtf8),
     }
+}
+
+/// Byte length for deterministic types defined in v5.0 spec
+pub(crate) struct ByteLengths;
+
+impl ByteLengths {
+    pub const BYTE_INT: u8 = 1;
+    pub const TWO_BYTE_INT: u8 = 2;
+    pub const FOUR_BYTE_INT: u8 = 4;
+}
+
+/// decode variable byte integer defined in MQTT v5.0 spec
+/// returns the decoded variable byte integer and the length of bytes decoded
+pub(crate) fn decode_variable_byte(stream: &mut Bytes) -> (Result<i32, Error>, u8) {
+    (Ok(0), 0)
+}
+
+/// encode variable byte integer defined in MQTT v5.0 spec
+/// returns the encoded bytes and length of bytes encoded.
+pub(crate) fn encode_variable_byte(value: i32) -> (Result<Bytes, Error>, u8) {
+    (Ok(Bytes::from("wip")), 0)
+}
+
+/// decode utf-8 string defined in MQTT v5.0 spec
+/// returns the decoded utf-8 string and the length of bytes decoded
+pub(crate) fn decode_utf_string(stream: &mut Bytes) -> (Result<String, Error>, u8) {
+    (Ok(String::from("wip")), 0)
+}
+
+/// encode utf-8 string defined in MQTT v5.0 spec
+/// returns the encoded utf-8 string and length of bytes encoded.
+pub(crate) fn encode_utf_string(value: String) -> (Result<Bytes, Error>, u8) {
+    (Ok(Bytes::from("wip")), 0)
 }

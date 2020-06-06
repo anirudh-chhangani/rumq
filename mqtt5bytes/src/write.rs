@@ -228,6 +228,7 @@ mod test {
             }),
             username: Some("rust".to_owned()),
             password: Some("mq".to_owned()),
+            properties: None
         });
 
         let mut buf = BytesMut::new();
@@ -304,6 +305,7 @@ mod test {
             pkid: 10,
             payload: Bytes::from(vec![0xF1, 0xF2, 0xF3, 0xF4]),
             bytes: Bytes::new(),
+            properties: None
         });
 
         let mut buf = BytesMut::new();
@@ -325,6 +327,7 @@ mod test {
             pkid: 0,
             payload: Bytes::from(vec![0xE1, 0xE2, 0xE3, 0xE4]),
             bytes: Bytes::new(),
+            properties: None
         });
 
         let mut buf = BytesMut::new();
@@ -351,6 +354,7 @@ mod test {
                     qos: QoS::ExactlyOnce,
                 },
             ],
+            properties: None
         });
 
         let mut buf = BytesMut::new();

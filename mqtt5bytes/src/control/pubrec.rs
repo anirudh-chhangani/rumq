@@ -1,10 +1,19 @@
 use crate::Error;
 use crate::FixedHeader;
 use bytes::{Buf, Bytes};
+use alloc::string::String;
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PubRecProperties {
+    pub reason_string: Option<String>,
+    pub user_property: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PubRec {
     pub pkid: u16,
+    pub properties: Option<PubRecProperties>
 }
 
 impl PubRec {
@@ -16,14 +25,26 @@ impl PubRec {
         let variable_header_index = fixed_header.header_len;
         bytes.advance(variable_header_index);
         let pkid = bytes.get_u16();
-        let pubrec = PubRec { pkid };
+        let _props = extract_properties(&mut bytes)?;
+        let pubrec = match _props {
+            Some(props)=>{
+                let properties = Some(
+                    PubRecProperties{
+                        reason_string: props.reason_string,
+                        user_property: props.user_property
+                    }
+                );
+                PubRec { pkid, properties }
+            }
+            None => PubRec { pkid, properties: None }
+        };
 
         Ok(pubrec)
     }
 }
 
 impl PubRec {
-    pub fn new(pkid: u16) -> PubRec {
-        PubRec { pkid }
+    pub fn new(pkid: u16, properties: Option<PubRecProperties>) -> PubRec {
+        PubRec { pkid, properties }
     }
 }

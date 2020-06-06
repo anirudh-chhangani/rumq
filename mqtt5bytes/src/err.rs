@@ -15,6 +15,8 @@ cfg_if! {
             IncorrectPacketFormat,
             #[error("Unsupported Packet type `{0}`")]
             InvalidPacketType(u8),
+            #[error("Unsupported Property")]
+            InvalidProperty,
             #[error("Unsupported QoS `{0}`")]
             InvalidQoS(u8),
             #[error("Invalid packet identifier = 0")]
@@ -45,6 +47,7 @@ cfg_if! {
             InvalidProtocolLevel(u8),
             IncorrectPacketFormat,
             InvalidPacketType(u8),
+            InvalidProperty,
             InvalidQoS(u8),
             PacketIdZero,
             PayloadSizeIncorrect,

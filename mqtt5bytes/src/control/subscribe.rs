@@ -4,11 +4,19 @@ use alloc::vec;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
 use core::fmt;
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubscribeProperties {
+    pub subscription_identifier: Option<u32>,
+    pub user_property: Option<String>,
+}
 
 #[derive(Clone, PartialEq)]
 pub struct Subscribe {
     pub pkid: u16,
     pub topics: Vec<SubscribeTopic>,
+    pub properties: Option<SubscribeProperties>
 }
 
 impl Subscribe {
@@ -30,8 +38,19 @@ impl Subscribe {
                 qos: qos(requested_qos)?,
             });
         }
-
-        let subscribe = Subscribe { pkid, topics };
+        let _props = extract_properties(&mut bytes)?;
+        let subscribe = match _props {
+            Some(props) => {
+                let properties = Some(
+                    SubscribeProperties {
+                        subscription_identifier: props.subscription_identifier,
+                        user_property: props.user_property,
+                    }
+                );
+                Subscribe { pkid, topics, properties }
+            }
+            None => Subscribe { pkid, topics, properties: None }
+        };
 
         Ok(subscribe)
     }
@@ -47,6 +66,7 @@ impl Subscribe {
         Subscribe {
             pkid: 0,
             topics: vec![topic],
+            properties: None
         }
     }
 
@@ -54,6 +74,7 @@ impl Subscribe {
         Subscribe {
             pkid: 0,
             topics: Vec::new(),
+            properties: None
         }
     }
 
@@ -134,6 +155,7 @@ mod test_publish {
                         qos: QoS::ExactlyOnce,
                     }
                 ],
+                properties: None
             }
         );
     }

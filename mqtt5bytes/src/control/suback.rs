@@ -1,11 +1,20 @@
 use crate::{qos, Error, FixedHeader, SubscribeReturnCodes};
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
+use alloc::string::String;
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubAckProperties {
+    pub reason_string: Option<String>,
+    pub user_property: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubAck {
     pub pkid: u16,
     pub return_codes: Vec<SubscribeReturnCodes>,
+    properties: Option<SubAckProperties>,
 }
 
 impl SubAck {
@@ -26,15 +35,28 @@ impl SubAck {
             }
             payload_bytes -= 1
         }
-        let suback = SubAck { pkid, return_codes };
+
+        let _props = extract_properties(&mut bytes)?;
+        let suback = match _props {
+            Some(props) => {
+                let properties = Some(
+                    SubAckProperties {
+                        reason_string: props.reason_string,
+                        user_property: props.user_property,
+                    }
+                );
+                SubAck { pkid, return_codes, properties }
+            }
+            None => SubAck { pkid, return_codes, properties: None }
+        };
 
         Ok(suback)
     }
 }
 
 impl SubAck {
-    pub fn new(pkid: u16, return_codes: Vec<SubscribeReturnCodes>) -> SubAck {
-        SubAck { pkid, return_codes }
+    pub fn new(pkid: u16, return_codes: Vec<SubscribeReturnCodes>, properties: Option<SubAckProperties>) -> SubAck {
+        SubAck { pkid, return_codes, properties }
     }
 }
 
@@ -67,6 +89,7 @@ mod test_publish {
             SubAck {
                 pkid: 15,
                 return_codes: vec![SubscribeReturnCodes::Success(QoS::AtLeastOnce), SubscribeReturnCodes::Failure],
+                properties: None,
             }
         );
     }

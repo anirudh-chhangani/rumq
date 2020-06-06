@@ -2,11 +2,18 @@ use crate::{extract_mqtt_string, Error, FixedHeader};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
+use crate::control::properties::extract_properties;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnsubscribeProperties {
+    pub user_property: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unsubscribe {
     pub pkid: u16,
     pub topics: Vec<String>,
+    pub properties: Option<UnsubscribeProperties>,
 }
 
 impl Unsubscribe {
@@ -23,7 +30,18 @@ impl Unsubscribe {
             topics.push(topic_filter);
         }
 
-        let unsubscribe = Unsubscribe { pkid, topics };
+        let _props = extract_properties(&mut bytes)?;
+        let unsubscribe= match _props {
+            Some(props)=>{
+                let properties = Some(
+                    UnsubscribeProperties{
+                        user_property: props.user_property
+                    }
+                );
+                Unsubscribe { pkid, topics, properties }
+            }
+            None => Unsubscribe { pkid, topics, properties: None }
+        };
 
         Ok(unsubscribe)
     }
