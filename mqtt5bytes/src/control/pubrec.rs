@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, Utf8Pair};
 use crate::FixedHeader;
 use bytes::{Buf, Bytes};
 use alloc::string::String;
@@ -7,7 +7,7 @@ use crate::control::properties::extract_properties;
 #[derive(Debug, Clone, PartialEq)]
 pub struct PubRecProperties {
     pub reason_string: Option<String>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

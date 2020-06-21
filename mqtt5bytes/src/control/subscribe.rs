@@ -1,4 +1,4 @@
-use crate::{extract_mqtt_string, qos, Error, FixedHeader, QoS, SubscribeTopic};
+use crate::{extract_mqtt_string, qos, Error, FixedHeader, QoS, SubscribeTopic, Utf8Pair};
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -9,7 +9,7 @@ use crate::control::properties::extract_properties;
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubscribeProperties {
     pub subscription_identifier: Option<u32>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
 }
 
 #[derive(Clone, PartialEq)]

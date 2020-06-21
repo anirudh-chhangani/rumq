@@ -1,4 +1,4 @@
-use crate::{extract_mqtt_string, qos, Error, FixedHeader, QoS};
+use crate::{extract_mqtt_string, qos, Error, FixedHeader, QoS, Utf8Pair};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
@@ -12,7 +12,7 @@ pub struct PublishProperties {
     pub topic_alias: Option<u16>,
     pub response_topic: Option<String>,
     pub correlation_data: Option<String>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
     pub subscription_identifier: Option<u32>,
     pub content_type: Option<String>,
 }

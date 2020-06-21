@@ -33,6 +33,8 @@ cfg_if! {
             TopicNotUtf8,
             #[error("Malformed remaining length")]
             MalformedRemainingLength,
+            #[error("Malformed variable byte integer")]
+            MalformedVariableByteInteger,
             #[error("Trying to access wrong boundary")]
             BoundaryCrossed,
             #[error("EOF. Not enough data in buffer")]
@@ -57,6 +59,7 @@ cfg_if! {
             TopicNotUtf8,
             BoundaryCrossed,
             MalformedRemainingLength,
+            MalformedVariableByteInteger,
             UnexpectedEof,
         }
     }

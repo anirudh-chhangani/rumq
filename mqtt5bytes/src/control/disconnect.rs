@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, Utf8Pair};
 use crate::FixedHeader;
 
 use bytes::Bytes;
@@ -9,7 +9,7 @@ use alloc::string::String;
 pub struct DisconnectProperties {
     pub session_expiry_interval: Option<u32>,
     pub reason_string: Option<String>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
     pub server_reference: Option<String>,
 }
 

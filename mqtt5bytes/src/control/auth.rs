@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, Utf8Pair};
 use crate::FixedHeader;
 
 use bytes::Bytes;
@@ -10,7 +10,7 @@ pub struct AuthProperties {
     pub authentication_method: Option<String>,
     pub authentication_data: Option<String>,
     pub reason_string: Option<String>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

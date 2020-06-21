@@ -1,4 +1,4 @@
-use crate::{Error, FixedHeader, ByteLengths};
+use crate::{Error, FixedHeader, ByteLengths, Utf8Pair};
 use bytes::{Buf, Bytes};
 use crate::reasoncodes::ReasonCode;
 use alloc::string::String;
@@ -14,7 +14,7 @@ pub struct ConnackProperties {
     pub response_info: Option<String>,
     pub server_info: Option<String>,
     pub reason_string: Option<String>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
     pub receive_maximum: Option<u16>,
     pub topic_alias_maximum: Option<u16>,
     pub maximum_qos: Option<u8>,

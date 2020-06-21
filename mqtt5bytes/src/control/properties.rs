@@ -1,6 +1,7 @@
 use bytes::{Bytes, Buf};
 use alloc::string::String;
-use crate::{Error, ByteLengths, decode_variable_byte, decode_utf_string};
+use crate::{Error, ByteLengths, decode_variable_byte, decode_utf_string, Utf8Pair, decode_utf_string_pair};
+use alloc::vec::Vec;
 
 pub(crate) struct PropertyIdentifiers;
 
@@ -59,7 +60,7 @@ pub struct Properties {
     pub topic_alias: Option<u16>,
     pub maximum_qos: Option<u8>,
     pub retain_available: Option<u8>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
     pub maximum_packet_size: Option<u32>,
     pub wildcard_subscription_available: Option<u8>,
     pub subscription_identifier_available: Option<u8>,
@@ -67,8 +68,8 @@ pub struct Properties {
 }
 
 pub fn extract_properties(stream: &mut Bytes) -> Result<Option<Properties>, Error> {
-    let mut prop_length: u8 = stream.get_u8();
-
+    let (_prop_length, _read) = decode_variable_byte(stream);
+    let mut prop_length = _prop_length?;
     if prop_length > 0 {
         let mut payload_format_indicator: Option<u8> = None;
         let mut message_expiry_interval: Option<u32> = None;
@@ -92,7 +93,7 @@ pub fn extract_properties(stream: &mut Bytes) -> Result<Option<Properties>, Erro
         let mut topic_alias: Option<u16> = None;
         let mut maximum_qos: Option<u8> = None;
         let mut retain_available: Option<u8> = None;
-        let mut user_property: Option<String> = None;
+        let mut user_property: Option<Utf8Pair> = None;
         let mut maximum_packet_size: Option<u32> = None;
         let mut wildcard_subscription_available: Option<u8> = None;
         let mut subscription_identifier_available: Option<u8> = None;
@@ -169,15 +170,18 @@ pub fn extract_properties(stream: &mut Bytes) -> Result<Option<Properties>, Erro
                         prop_length -= ByteLengths::BYTE_INT;
                     }
                     PropertyIdentifiers::RESPONSE_INFO => {
-                        let (data, len) = decode_variable_byte(stream);
+                        let (data, len) = decode_utf_string(stream);
+                        response_info = Some(data?);
                         prop_length -= len;
                     }
                     PropertyIdentifiers::SERVER_INFO => {
-                        let (data, len) = decode_variable_byte(stream);
+                        let (data, len) = decode_utf_string(stream);
+                        server_info = Some(data?);
                         prop_length -= len;
                     }
                     PropertyIdentifiers::REASON_STRING => {
-                        let (data, len) = decode_variable_byte(stream);
+                        let (data, len) = decode_utf_string(stream);
+                        reason_string = Some(data?);
                         prop_length -= len;
                     }
                     PropertyIdentifiers::RECEIVE_MAXIMUM => {
@@ -201,7 +205,7 @@ pub fn extract_properties(stream: &mut Bytes) -> Result<Option<Properties>, Erro
                         prop_length -= ByteLengths::BYTE_INT;
                     }
                     PropertyIdentifiers::USER_PROPERTY => {
-                        let (data, len) = decode_utf_string(stream);
+                        let (data, len) = decode_utf_string_pair(stream);
                         user_property = Some(data?);
                         prop_length -= len
                     }

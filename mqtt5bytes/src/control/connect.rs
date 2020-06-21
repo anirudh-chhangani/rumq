@@ -1,8 +1,8 @@
-use crate::{extract_mqtt_string, qos, Error, FixedHeader, LastWill, Protocol};
+use crate::{extract_mqtt_string, qos, Error, FixedHeader, LastWill, Protocol, Utf8Pair};
+use crate::control::properties::extract_properties;
 use alloc::string::String;
 use bytes::{Buf, Bytes};
 use core::fmt;
-use crate::control::properties::extract_properties;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConnectProperties {
@@ -12,7 +12,7 @@ pub struct ConnectProperties {
     pub topic_alias_maximum: Option<u16>,
     pub request_response_information: Option<u8>,
     pub request_problem_information: Option<u8>,
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
     pub authentication_methods: Option<String>,
     pub authentication_data: Option<String>,
 }

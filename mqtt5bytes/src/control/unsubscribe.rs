@@ -1,4 +1,4 @@
-use crate::{extract_mqtt_string, Error, FixedHeader};
+use crate::{extract_mqtt_string, Error, FixedHeader, Utf8Pair};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
@@ -6,7 +6,7 @@ use crate::control::properties::extract_properties;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnsubscribeProperties {
-    pub user_property: Option<String>,
+    pub user_property: Option<Utf8Pair>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,10 +31,10 @@ impl Unsubscribe {
         }
 
         let _props = extract_properties(&mut bytes)?;
-        let unsubscribe= match _props {
-            Some(props)=>{
+        let unsubscribe = match _props {
+            Some(props) => {
                 let properties = Some(
-                    UnsubscribeProperties{
+                    UnsubscribeProperties {
                         user_property: props.user_property
                     }
                 );
