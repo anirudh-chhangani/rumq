@@ -55,7 +55,7 @@ mod test_publish {
     use crate::*;
     use alloc::borrow::ToOwned;
     use alloc::vec;
-    use bytes::{Bytes, BytesMut};
+    use bytes::{Bytes};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -70,7 +70,7 @@ mod test_publish {
             0xBE,
             0xEF, // extra control in the stream
         ];
-        let mut stream = BytesMut::from(&stream[..]);
+        let mut stream = Bytes::from(&stream[..]);
 
         let packet = mqtt_read(&mut stream, 100).unwrap();
         let packet = match packet {

@@ -1,5 +1,5 @@
 use crate::Error;
-use bytes::BytesMut;
+use bytes::{BytesMut, Bytes, Buf};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::read::mqtt_read;
@@ -26,7 +26,7 @@ impl Decoder for MqttCodec {
         }
 
         // Find ways to reserve `buf` better to optimize allocations
-        let packet = match mqtt_read(buf, self.max_payload_size) {
+        let packet = match mqtt_read(&mut Bytes::from(*buf), self.max_payload_size) {
             Ok(len) => len,
             Err(Error::UnexpectedEof) => return Ok(None),
             Err(e) => return Err(e),

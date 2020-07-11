@@ -1,4 +1,4 @@
-use bytes::{Bytes, Buf};
+use bytes::{Bytes, Buf, BytesMut};
 use alloc::string::String;
 use crate::{Error, ByteLengths, decode_variable_byte, decode_utf_string, Utf8Pair, decode_utf_string_pair};
 use alloc::vec::Vec;

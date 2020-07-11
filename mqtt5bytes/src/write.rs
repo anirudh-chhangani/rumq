@@ -7,47 +7,47 @@ use bytes::BytesMut;
 pub fn mqtt_write(packet: Packet, payload: &mut BytesMut) -> Result<(), Error> {
     match packet {
         Packet::Connect(packet) => {
-            let len = packet.len();
-            payload.reserve(len);
-            payload.put_u8(0b0001_0000);
-            write_remaining_length(payload, len)?;
-            write_mqtt_string(payload, "MQTT");
-            payload.put_u8(0x04);
-
-            let mut connect_flags = 0;
-            if packet.clean_session {
-                connect_flags |= 0x02;
-            }
-
-            match &packet.last_will {
-                Some(w) if w.retain => connect_flags |= 0x04 | (w.qos as u8) << 3 | 0x20,
-                Some(w) => connect_flags |= 0x04 | (w.qos as u8) << 3,
-                None => (),
-            }
-
-            if packet.password.is_some() {
-                connect_flags |= 0x40;
-            }
-
-            if packet.username.is_some() {
-                connect_flags |= 0x80;
-            }
-
-            payload.put_u8(connect_flags);
-            payload.put_u16(packet.keep_alive);
-            write_mqtt_string(payload, &packet.client_id);
-
-            if let Some(ref last_will) = packet.last_will {
-                write_mqtt_string(payload, &last_will.topic);
-                write_mqtt_string(payload, &last_will.message);
-            }
-
-            if let Some(ref username) = packet.username {
-                write_mqtt_string(payload, username);
-            }
-            if let Some(ref password) = packet.password {
-                write_mqtt_string(payload, password);
-            }
+            // let len = packet.len();
+            // payload.reserve(len);
+            // payload.put_u8(0b0001_0000);
+            // write_remaining_length(payload, len)?;
+            // write_mqtt_string(payload, "MQTT");
+            // payload.put_u8(0x04);
+            //
+            // let mut connect_flags = 0;
+            // if packet.clean_session {
+            //     connect_flags |= 0x02;
+            // }
+            //
+            // match &packet.last_will {
+            //     Some(w) if w.retain => connect_flags |= 0x04 | (w.qos as u8) << 3 | 0x20,
+            //     Some(w) => connect_flags |= 0x04 | (w.qos as u8) << 3,
+            //     None => (),
+            // }
+            //
+            // if packet.password.is_some() {
+            //     connect_flags |= 0x40;
+            // }
+            //
+            // if packet.username.is_some() {
+            //     connect_flags |= 0x80;
+            // }
+            //
+            // payload.put_u8(connect_flags);
+            // payload.put_u16(packet.keep_alive);
+            // write_mqtt_string(payload, &packet.client_id);
+            //
+            // if let Some(ref last_will) = packet.last_will {
+            //     write_mqtt_string(payload, &last_will.topic);
+            //     write_mqtt_string(payload, &last_will.message);
+            // }
+            //
+            // if let Some(ref username) = packet.username {
+            //     write_mqtt_string(payload, username);
+            // }
+            // if let Some(ref password) = packet.password {
+            //     write_mqtt_string(payload, password);
+            // }
 
             Ok(())
         }
@@ -216,18 +216,19 @@ mod test {
     #[test]
     fn write_packet_connect_mqtt_protocol_works() {
         let connect = Packet::Connect(Connect {
-            protocol: Protocol::MQTT(4),
+            protocol: Protocol::MQTT(5),
+            proto_name: String::from("MQTT"),
             keep_alive: 10,
             client_id: "test".to_owned(),
-            clean_session: true,
-            last_will: Some(LastWill {
-                topic: "/a".to_owned(),
-                message: "offline".to_owned(),
-                retain: false,
-                qos: QoS::AtLeastOnce,
-            }),
-            username: Some("rust".to_owned()),
-            password: Some("mq".to_owned()),
+            flags: ConnectFlags{
+                username: false,
+                password: false,
+                will_retain: false,
+                will_flag: false,
+                will_qos: 0,
+                clean_session: true,
+                reserved: 0
+            },
             properties: None
         });
 

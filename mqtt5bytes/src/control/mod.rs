@@ -186,21 +186,31 @@ pub(crate) fn encode_binary_data(value: Bytes) -> Result<Bytes, Error> {
 
 #[cfg(test)]
 mod test_decoding {
-    use crate::{decode_variable_byte, Error};
-    use bytes::Buf;
+    use crate::{decode_variable_byte, Error, encode_variable_byte};
+    use bytes::{Buf, Bytes};
 
     #[test]
-    fn variable_byte_int() {
-        let mut stream = bytes::BytesMut::new();
-        let vbs = &[
+    fn decode_variable_byte_int() {
+        let vbi = &[
+            0x7F,
             0x7F
         ];
-
-        stream.extend_from_slice(&vbs[..]);
-        let (res, len) = decode_variable_byte(&mut stream.to_bytes());
+        let mut stream = bytes::Bytes::from(&vbi[..]);
+        let (res, len) = decode_variable_byte(&mut stream);
         assert_eq!(len, 1);
         match res {
             Ok(val) => assert_eq!(val, 127),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn encode_variable_byte_int() {
+        let res = encode_variable_byte(912);
+        match res {
+            Ok(raw) => {
+                assert_eq!(raw, Bytes::from("lal"));
+            }
             _ => {}
         }
     }

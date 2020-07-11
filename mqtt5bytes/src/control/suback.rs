@@ -76,7 +76,7 @@ mod test_publish {
             0x01, 0x80, // payload. return codes [success qos1, failure]
             0xDE, 0xAD, 0xBE, 0xEF, // extra control in the stream
         ];
-        let mut stream = BytesMut::from(&stream[..]);
+        let mut stream = Bytes::from(&stream[..]);
 
         let packet = mqtt_read(&mut stream, 100).unwrap();
         let packet = match packet {
