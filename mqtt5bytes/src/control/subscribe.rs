@@ -129,7 +129,7 @@ mod test_publish {
             0xBE,
             0xEF, // extra control in the stream
         ];
-        let mut stream = Bytes::from(&stream[..]);
+        let mut stream = BytesMut::from(&stream[..]);
 
         let packet = mqtt_read(&mut stream, 100).unwrap();
         let packet = match packet {

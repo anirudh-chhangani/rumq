@@ -1,9 +1,9 @@
 use crate::control::*;
 use crate::enums::Packet;
 use crate::{packet_type, Error, FixedHeader, PacketType};
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 
-pub fn mqtt_read(stream: &mut Bytes, max_payload_size: usize) -> Result<Packet, Error> {
+pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packet, Error> {
     // Read the initial bytes necessary from the stream with out mutating the stream cursor
     let (byte1, remaining_len) = parse_fixed_header(stream)?;
     let header_len = header_len(remaining_len);
@@ -24,7 +24,7 @@ pub fn mqtt_read(stream: &mut Bytes, max_payload_size: usize) -> Result<Packet, 
     }
 
     // Test with a stream with exactly the size to check border panics
-    let packet = stream.split_to(len);
+    let mut packet = stream.split_to(len);
     let control_type = packet_type(byte1 >> 4)?;
 
     if remaining_len == 0 {
@@ -47,35 +47,35 @@ pub fn mqtt_read(stream: &mut Bytes, max_payload_size: usize) -> Result<Packet, 
         stream.reserve(6 + max_payload_size)
     }
 
-    let packet = match control_type {
-        PacketType::Connect => Packet::Connect(Connect::assemble(fixed_header, packet)?),
-        PacketType::ConnAck => Packet::ConnAck(ConnAck::assemble(fixed_header, packet)?),
-        PacketType::Publish => Packet::Publish(Publish::assemble(fixed_header, packet)?),
-        PacketType::PubAck => Packet::PubAck(PubAck::assemble(fixed_header, packet)?),
-        PacketType::PubRec => Packet::PubRec(PubRec::assemble(fixed_header, packet)?),
-        PacketType::PubRel => Packet::PubRel(PubRel::assemble(fixed_header, packet)?),
-        PacketType::PubComp => Packet::PubComp(PubComp::assemble(fixed_header, packet)?),
-        PacketType::Subscribe => Packet::Subscribe(Subscribe::assemble(fixed_header, packet)?),
-        PacketType::SubAck => Packet::SubAck(SubAck::assemble(fixed_header, packet)?),
-        PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::assemble(fixed_header, packet)?),
-        PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::assemble(fixed_header, packet)?),
+    let mut packet = match control_type {
+        PacketType::Connect => Packet::Connect(Connect::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::ConnAck => Packet::ConnAck(ConnAck::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::Publish => Packet::Publish(Publish::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::PubAck => Packet::PubAck(PubAck::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::PubRec => Packet::PubRec(PubRec::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::PubRel => Packet::PubRel(PubRel::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::PubComp => Packet::PubComp(PubComp::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::Subscribe => Packet::Subscribe(Subscribe::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::SubAck => Packet::SubAck(SubAck::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::assemble(fixed_header, packet.to_bytes())?),
         PacketType::PingReq => Packet::PingReq,
         PacketType::PingResp => Packet::PingResp,
-        PacketType::Disconnect => Packet::Disconnect(Disconnect::assemble(fixed_header, packet)?),
-        PacketType::Auth => Packet::Auth(Auth::assemble(fixed_header, packet)?),
+        PacketType::Disconnect => Packet::Disconnect(Disconnect::assemble(fixed_header, packet.to_bytes())?),
+        PacketType::Auth => Packet::Auth(Auth::assemble(fixed_header, packet.to_bytes())?),
     };
 
     Ok(packet)
 }
 
-fn parse_fixed_header(stream: &mut Bytes) -> Result<(u8, usize), Error> {
+fn parse_fixed_header(stream: &mut BytesMut) -> Result<(u8, usize), Error> {
     if stream.is_empty() {
         return Err(Error::UnexpectedEof);
     }
     let byte1 = stream.get_u8();
-    let (_len, _) = decode_variable_byte(stream);
-    let len = _len?.to_usize()?;
-    Ok((byte1, len))
+    let (_len, _) = decode_variable_byte(&mut stream.to_bytes());
+    let len = _len?;
+    Ok((byte1, len as usize))
 }
 
 fn header_len(remaining_len: usize) -> usize {
@@ -100,22 +100,44 @@ mod test {
 
     #[test]
     fn fixed_header_is_parsed_as_expected() {
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0x00])).unwrap();
+
+        let (_, remaining_len) = parse_fixed_header(&mut BytesMut::from("\x10\x00")).unwrap();
         assert_eq!(remaining_len, 0);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0x7f])).unwrap();
+
+        let (_, remaining_len) = parse_fixed_header(&mut BytesMut::from("\x10\x7f")).unwrap();
         assert_eq!(remaining_len, 127);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0x80, 0x01])).unwrap();
+
+        let data = &mut BytesMut::new();
+
+        data.extend_from_slice(b"\x10\x80\x01");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 128);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0xff, 0x7f])).unwrap();
+        data.clear();
+
+        data.extend_from_slice(b"\x10\xff\x7f");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 16383);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0x80, 0x80, 0x01])).unwrap();
+        data.clear();
+
+        data.extend_from_slice(b"\x10\x80\x80\x01");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 16384);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0xff, 0xff, 0x7f])).unwrap();
+        data.clear();
+
+        data.extend_from_slice(b"\x10\xff\xff\x7f");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 2_097_151);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0x80, 0x80, 0x80, 0x01])).unwrap();
+        data.clear();
+
+        data.extend_from_slice(b"\x10\x80\x80\x80\x01");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 2_097_152);
-        let (_, remaining_len) = parse_fixed_header(&mut Bytes::from(vec![0x10, 0xff, 0xff, 0xff, 0x7f])).unwrap();
+        data.clear();
+
+        data.extend_from_slice(b"\x10\xff\xff\xff\x7f");
+        let (_, remaining_len) = parse_fixed_header(data).unwrap();
         assert_eq!(remaining_len, 268_435_455);
+        data.clear();
     }
     //
     // #[test]

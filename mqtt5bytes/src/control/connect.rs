@@ -154,7 +154,7 @@ mod test_connect {
             00, 00, 09, 63, 00, 10, 0x6c, 69, 65, 0x6e, 74, 0x2d, 69, 64,
         ];
 
-        let mut stream = bytes::Bytes::from(&packet_stream[..]);
+        let mut stream = bytes::BytesMut::from(&packet_stream[..]);
         let packet = mqtt_read(&mut stream, 100).unwrap();
         let packet = match packet {
             Packet::Connect(connect) => connect,
