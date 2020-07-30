@@ -5,7 +5,7 @@ use bytes::{Buf, Bytes, BytesMut};
 
 pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packet, Error> {
     // Read the initial bytes necessary from the stream with out mutating the stream cursor
-    let (byte1, remaining_len) = parse_fixed_header(stream)?;
+    let (byte1, remaining_len) = parse_fixed_header(stream.clone())?;
     let header_len = header_len(remaining_len);
     let len = header_len + remaining_len;
 
@@ -68,12 +68,15 @@ pub fn mqtt_read(stream: &mut BytesMut, max_payload_size: usize) -> Result<Packe
     Ok(packet)
 }
 
-fn parse_fixed_header(stream: &mut BytesMut) -> Result<(u8, usize), Error> {
+fn parse_fixed_header(mut stream: BytesMut) -> Result<(u8, usize), Error> {
     if stream.is_empty() {
         return Err(Error::UnexpectedEof);
     }
+
     let byte1 = stream.get_u8();
-    let (_len, _) = decode_variable_byte(&mut stream.to_bytes());
+    let (_len, _) = decode_variable_byte(
+        &mut Bytes::from(stream.to_bytes())
+    );
     let len = _len?;
     Ok((byte1, len as usize))
 }
@@ -100,42 +103,43 @@ mod test {
 
     #[test]
     fn fixed_header_is_parsed_as_expected() {
+        let mut data = BytesMut::new();
 
-        let (_, remaining_len) = parse_fixed_header(&mut BytesMut::from("\x10\x00")).unwrap();
+        let (_, remaining_len) = parse_fixed_header(BytesMut::from("\x10\x00")).unwrap();
         assert_eq!(remaining_len, 0);
+        data.clear();
 
-        let (_, remaining_len) = parse_fixed_header(&mut BytesMut::from("\x10\x7f")).unwrap();
+        let (_, remaining_len) = parse_fixed_header(BytesMut::from("\x10\x7f")).unwrap();
         assert_eq!(remaining_len, 127);
-
-        let data = &mut BytesMut::new();
+        data.clear();
 
         data.extend_from_slice(b"\x10\x80\x01");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 128);
         data.clear();
 
         data.extend_from_slice(b"\x10\xff\x7f");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 16383);
         data.clear();
 
         data.extend_from_slice(b"\x10\x80\x80\x01");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 16384);
         data.clear();
 
         data.extend_from_slice(b"\x10\xff\xff\x7f");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 2_097_151);
         data.clear();
 
         data.extend_from_slice(b"\x10\x80\x80\x80\x01");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 2_097_152);
         data.clear();
 
         data.extend_from_slice(b"\x10\xff\xff\xff\x7f");
-        let (_, remaining_len) = parse_fixed_header(data).unwrap();
+        let (_, remaining_len) = parse_fixed_header(data.clone()).unwrap();
         assert_eq!(remaining_len, 268_435_455);
         data.clear();
     }

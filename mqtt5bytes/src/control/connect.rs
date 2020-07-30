@@ -51,14 +51,14 @@ impl Connect {
             proto_name: String::from("MQTT"),
             keep_alive: 60,
             client_id: id.into(),
-            flags: ConnectFlags{
+            flags: ConnectFlags {
                 username: false,
                 password: false,
                 will_retain: false,
                 will_qos: 0,
                 will_flag: false,
                 clean_session: true,
-                reserved: 0
+                reserved: 0,
             },
             properties: None,
         }
@@ -67,9 +67,7 @@ impl Connect {
 
 impl Connect {
     pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Connect, Error> {
-
-        let variable_header_index = fixed_header.header_len;
-        bytes.advance(variable_header_index);
+        bytes.advance(fixed_header.header_len);
         let protocol_name = extract_mqtt_string(&mut bytes)?;
         let protocol_level = bytes.get_u8();
         if protocol_name != "MQTT" {
@@ -83,16 +81,15 @@ impl Connect {
 
         let flag_bytes = bytes.get_u8();
         let keep_alive = bytes.get_u16();
-        let client_id = extract_mqtt_string(&mut bytes)?;
 
-        let flags = ConnectFlags{
+        let flags = ConnectFlags {
             username: flag_bytes & (1 << 0b111) != 0,
             password: flag_bytes & (1 << 0b110) != 0,
             will_retain: flag_bytes & (1 << 0b101) != 0,
             will_qos: 0,
             will_flag: flag_bytes & (1 << 0b10) != 0,
             clean_session: flag_bytes & (1 << 0b1) != 0,
-            reserved: flag_bytes & (1 << 0b0)
+            reserved: flag_bytes & (1 << 0b0),
         };
 
         let _props = extract_properties(&mut bytes)?;
@@ -115,6 +112,8 @@ impl Connect {
             }
             None => None
         };
+
+        let client_id = extract_mqtt_string(&mut bytes)?;
 
         let connect = Connect {
             protocol,
@@ -150,8 +149,8 @@ mod test_connect {
     #[test]
     fn connect_stitching_works_correctly() {
         let packet_stream = &[
-            0x10, 16, 00, 04, 0x4d, 51, 54, 54, 05, 02, 00, 0x3c,
-            00, 00, 09, 63, 00, 10, 0x6c, 69, 65, 0x6e, 74, 0x2d, 69, 64,
+            0x10, 0x16, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x02, 0x00, 0x3c, 0x00,
+            0x00, 0x09, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x2d, 0x69, 0x64,
         ];
 
         let mut stream = bytes::BytesMut::from(&packet_stream[..]);
@@ -170,7 +169,7 @@ mod test_connect {
         assert_eq!(packet.flags.will_retain, false);
         assert_eq!(packet.flags.will_flag, false);
         assert_eq!(packet.flags.will_qos, 0);
-        assert_eq!(packet.flags.clean_session, false);
+        assert_eq!(packet.flags.clean_session, true);
         assert_eq!(packet.flags.reserved, 0);
 
         assert_eq!(
@@ -180,14 +179,14 @@ mod test_connect {
                 proto_name: String::from("MQTT"),
                 keep_alive: 60,
                 client_id: "client-id".to_owned(),
-                flags: ConnectFlags{
+                flags: ConnectFlags {
                     username: false,
                     password: false,
                     will_retain: false,
                     will_flag: false,
                     will_qos: 0,
                     clean_session: true,
-                    reserved: 0
+                    reserved: 0,
                 },
                 properties: None,
             }

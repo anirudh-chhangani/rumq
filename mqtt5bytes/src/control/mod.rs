@@ -75,8 +75,8 @@ impl ByteLengths {
 pub(crate) fn decode_variable_byte(stream: &mut Bytes) -> (Result<u32, Error>, u32) {
     let mut multiplier: u32 = 1;
     let mut value: u32 = 0;
-    let mut byte_len: u32 = 0;
-    let mut encoded_byte: u32 = 128;
+    let mut byte_len = 0;
+    let mut encoded_byte = 128;
     while (encoded_byte & 128) != 0 {
         encoded_byte = stream.get_u8() as u32;
         byte_len += ByteLengths::BYTE_INT;
@@ -102,7 +102,9 @@ pub(crate) fn encode_variable_byte(mut value: i32) -> Result<Bytes, Error> {
         if value > 0 {
             encoded_byte |= 128;
         }
-        buf.extend_from_slice(encoded_byte.to_ne_bytes().as_ref());
+        buf.extend_from_slice(
+            encoded_byte.to_ne_bytes().as_ref()
+        );
     }
     return Ok(Bytes::from(buf));
 }
