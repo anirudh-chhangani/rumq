@@ -40,7 +40,7 @@ impl Encoder<Packet> for MqttCodec {
     type Error = crate::Error;
 
     fn encode(&mut self, packet: Packet, buf: &mut BytesMut) -> Result<(), crate::Error> {
-        mqtt_write(packet, buf)?;
+        mqtt_write(packet)?;
         Ok(())
     }
 }

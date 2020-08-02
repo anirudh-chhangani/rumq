@@ -72,7 +72,7 @@ impl ByteLengths {
 /// Get the value of a multi-byte integer from a buffer
 /// Return the value, and the number of bytes used.
 /// [MQTT-1.5.5-1] the encoded value MUST use the minimum number of bytes necessary to represent the value
-pub(crate) fn decode_variable_byte(stream: &mut Bytes) -> (Result<u32, Error>, u32) {
+pub(crate) fn decode_variable_byte(stream: &mut Bytes) -> (Result<(u32, u32), Error>) {
     let mut multiplier: u32 = 1;
     let mut value: u32 = 0;
     let mut byte_len = 0;
@@ -81,21 +81,22 @@ pub(crate) fn decode_variable_byte(stream: &mut Bytes) -> (Result<u32, Error>, u
         encoded_byte = stream.get_u8() as u32;
         byte_len += ByteLengths::BYTE_INT;
         value += (encoded_byte & 127) * multiplier;
-        if multiplier > 128*128*128 {
-            return (Err(Error::MalformedVariableByteInteger), byte_len);
+        if multiplier > 128 * 128 * 128 {
+            return Err(Error::MalformedVariableByteInteger);
         }
         multiplier *= 128;
     }
-    return (Ok(value), byte_len);
+    return Ok((value, byte_len));
 }
 
 /// encode variable byte integer defined in MQTT v5.0 spec
 /// returns the encoded bytes and length of bytes encoded.
 /// Convert an integer 0 <= x <= 268435455 into multi-byte format.
-///  returns the buffer converted from the integer.
-pub(crate) fn encode_variable_byte(mut value: i32) -> Result<Bytes, Error> {
+///  returns the buffer converted from the integer and the len of bytes encoded.
+pub(crate) fn encode_variable_byte(mut value: i32) -> Result<(Bytes, u32), Error> {
     let mut encoded_byte = 0;
     let mut buf = BytesMut::new();
+    let mut encoded_len = 0;
     while value > 0 {
         encoded_byte = value % 128;
         value /= 128;
@@ -105,13 +106,14 @@ pub(crate) fn encode_variable_byte(mut value: i32) -> Result<Bytes, Error> {
         buf.extend_from_slice(
             encoded_byte.to_ne_bytes().as_ref()
         );
+        encoded_len += 1
     }
-    return Ok(Bytes::from(buf));
+    return Ok((Bytes::from(buf), encoded_len));
 }
 
 /// decode utf-8 string defined in MQTT v5.0 spec
 /// returns the decoded utf-8 string and the length of bytes decoded
-pub(crate) fn decode_utf_string(stream: &mut Bytes) -> (Result<String, Error>, u32) {
+pub(crate) fn decode_utf_string(stream: &mut Bytes) -> (Result<(String, u32), Error>) {
     let mut strlen = stream.get_u16();
     let bytelen = ByteLengths::TWO_BYTE_INT + strlen as u32; // as two bytes have been read above for strlen
     let mut data: Vec<u8> = Vec::new();
@@ -121,10 +123,10 @@ pub(crate) fn decode_utf_string(stream: &mut Bytes) -> (Result<String, Error>, u
     let decoded = String::from_utf8(data);
     match decoded {
         Ok(val) => {
-            (Ok(val), bytelen)
+            Ok((val, bytelen))
         }
         Err(utf_err) => {
-            (Err(Error::UnexpectedEof), bytelen)
+            Err(Error::UnexpectedEof)
         }
     }
 }
@@ -142,11 +144,10 @@ pub(crate) fn encode_utf_string(value: String) -> Result<Bytes, Error> {
 
 /// decode utf-8 string pair defined in MQTT v5.0 spec
 /// returns the decoded utf-8 string pair and the length of bytes decoded
-pub(crate) fn decode_utf_string_pair(stream: &mut Bytes) -> (Result<Utf8Pair, Error>, u32) {
-    let (K, l1) = decode_utf_string(stream);
-    let (V, l2) = decode_utf_string(stream);
-    let (k, v) = (K.unwrap(), V.unwrap());
-    (Ok((k, v)), l1 + l2)
+pub(crate) fn decode_utf_string_pair(stream: &mut Bytes) -> (Result<(Utf8Pair, u32), Error>) {
+    let (k, l1) = decode_utf_string(stream)?;
+    let (v, l2) = decode_utf_string(stream)?;
+    Ok(((k, v), l1 + l2))
 }
 
 /// encode utf-8 string pair defined in MQTT v5.0 spec
@@ -164,7 +165,7 @@ pub(crate) fn encode_utf_string_pair(value: Utf8Pair) -> Result<Bytes, Error> {
 
 /// decode binary data defined in MQTT v5.0 spec
 /// returns the decoded binary data and the length of bytes decoded
-pub(crate) fn decode_binary_data(stream: &mut Bytes) -> (Result<Bytes, Error>, u32)
+pub(crate) fn decode_binary_data(stream: &mut Bytes) -> (Result<(Bytes, u32), Error>)
 {
     let mut blen = stream.get_u16();
     let mut data = BytesMut::new();
@@ -173,7 +174,7 @@ pub(crate) fn decode_binary_data(stream: &mut Bytes) -> (Result<Bytes, Error>, u
         data.extend_from_slice(stream.get_u8().to_ne_bytes().as_ref())
     }
 
-    (Ok(data.to_bytes()), ByteLengths::TWO_BYTE_INT + data.len() as u32)
+    Ok((data.to_bytes(), ByteLengths::TWO_BYTE_INT + data.len() as u32))
 }
 
 /// encode binary data defined in MQTT v5.0 spec
@@ -192,28 +193,22 @@ mod test_decoding {
     use bytes::{Buf, Bytes};
 
     #[test]
-    fn decode_variable_byte_int() {
+    fn decode_variable_byte_int() -> Result<(), Error> {
         let vbi = &[
             0x7F,
             0x7F
         ];
         let mut stream = bytes::Bytes::from(&vbi[..]);
-        let (res, len) = decode_variable_byte(&mut stream);
+        let (val, len) = decode_variable_byte(&mut stream)?;
         assert_eq!(len, 1);
-        match res {
-            Ok(val) => assert_eq!(val, 127),
-            _ => {}
-        }
+        assert_eq!(val, 127);
+        Ok(())
     }
 
     #[test]
-    fn encode_variable_byte_int() {
-        let res = encode_variable_byte(912);
-        match res {
-            Ok(raw) => {
-                assert_eq!(raw, Bytes::from("lal"));
-            }
-            _ => {}
-        }
+    fn encode_variable_byte_int() -> Result<(), Error> {
+        let (val, len) = encode_variable_byte(2_097_152)?;
+        assert_eq!(len, 4);
+        Ok(())
     }
 }
