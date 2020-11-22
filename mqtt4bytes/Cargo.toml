@@ -1,21 +1,25 @@
 [package]
 name = "mqtt4bytes"
-version = "0.1.1"
+version = "0.4.0"
+readme = "README.md"
 authors = ["tekjar <raviteja@bytebeam.io>"]
 edition = "2018"
-license = "MIT"
+license = "Apache-2.0"
 description = "MQTT 4 core serialization and deserialization"
+keywords = ["mqtt"]
+categories = ["network-programming", "no-std"]
 
-[features]
-std = ["thiserror", "tokio-util"]
-default = ["std"]
+[lib]
+bench = false
 
 [dependencies]
-bytes = { version = "0.5", default-features = false }
-tokio-util = { version = "0.3", features = ["codec"], optional = true }
-thiserror = { version = "1", optional = true }
-rand = "0.7"
-cfg-if = "0.1"
+bytes = { version = "0.6", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
+rand = "0.7"
+criterion = "0.3"
+
+[[bench]]
+name = "bench"
+harness = false

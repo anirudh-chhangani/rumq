@@ -1,34 +1,39 @@
 #[macro_use]
 extern crate log;
 
+pub mod logs;
 pub mod router;
 pub mod storage;
 pub mod volatile;
-
-pub use mqtt4bytes;
-pub use router::{Router, RouterInMessage, RouterOutMessage, DataRequest, DataReply};
-pub use storage::segment::Segment;
-pub use storage::Log;
-pub use tokio::sync::mpsc::{channel, Sender, Receiver};
+pub mod waiters;
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+pub use router::connection::Connection;
+pub use router::{
+    Acks, ConnectionAck, Data, DataRequest, Disconnection, Event, Message, MetricsReply,
+    MetricsRequest, Notification, ReplicationData, Router,
+};
+pub use storage::segment::Segment;
+pub use storage::Log;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterConfig {
-    id: u8,
-    host: String,
-    port: u16,
-}
+pub use jackiechan::{bounded, Receiver, RecvError, SendError, Sender};
+pub use mqtt4bytes::{Packet, Publish, QoS, Subscribe};
+use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncRead, AsyncWrite};
+
+pub type ConnectionId = usize;
+pub type RouterId = usize;
+pub type Topic = String;
+pub type TopicId = usize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    pub id: u8,
+    pub id: usize,
     pub dir: PathBuf,
-    pub max_segment_size: u64,
+    pub max_segment_size: usize,
     pub max_segment_count: usize,
-    pub routers: Option<Vec<RouterConfig>>,
+    pub max_connections: usize,
 }
 
 impl Default for Config {
@@ -36,9 +41,12 @@ impl Default for Config {
         Config {
             id: 255,
             dir: PathBuf::from("/tmp/timestone"),
-            max_segment_size: 100 * 1024 * 1024,
-            max_segment_count: 100,
-            routers: None,
+            max_segment_size: 5 * 1024 * 1024,
+            max_segment_count: 1024,
+            max_connections: 1010,
         }
     }
 }
+
+pub trait IO: AsyncRead + AsyncWrite + Send + Unpin {}
+impl<T: AsyncRead + AsyncWrite + Send + Unpin> IO for T {}

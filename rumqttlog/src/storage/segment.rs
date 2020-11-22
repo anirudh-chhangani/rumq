@@ -22,7 +22,11 @@ impl Segment {
     pub fn new<P: AsRef<Path>>(dir: P, base_offset: u64) -> io::Result<Segment> {
         let file_name = format!("{:020}.segment", base_offset);
         let file_path: PathBuf = dir.as_ref().join(file_name);
-        let file = OpenOptions::new().read(true).append(true).create(true).open(&file_path)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true)
+            .open(&file_path)?;
         let metadata = file.metadata()?;
 
         // 1MB buffer size
@@ -53,7 +57,10 @@ impl Segment {
     pub fn append(&mut self, record: &[u8]) -> io::Result<(u64, u64)> {
         let record_size = record.len() as u64;
         if record_size > self.max_record_size {
-            return Err(io::Error::new(io::ErrorKind::Other, "Max record size exceeded"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Max record size exceeded",
+            ));
         }
 
         // append record and increment size. cursor is moved to the end as per the docs
@@ -70,12 +77,30 @@ impl Segment {
     }
 
     /// Reads to fill the complete buffer. Returns number of bytes read
-    pub fn read(&mut self, position: u64, mut buf: &mut [u8]) -> io::Result<u64> {
+    pub fn read(&mut self, position: u64, buf: &mut [u8]) -> io::Result<u64> {
         // TODO: No need to flush segments which are already filled. Make this conditional and check perf
         self.writer.flush()?;
+        self.read_at(position, buf)
+    }
 
+    #[inline]
+    #[cfg(target_family = "unix")]
+    fn read_at(&mut self, position: u64, mut buf: &mut [u8]) -> io::Result<u64> {
         use std::os::unix::fs::FileExt;
+
         self.file.read_exact_at(&mut buf, position)?;
+
+        Ok(buf.len() as u64)
+    }
+
+    #[inline]
+    #[cfg(target_family = "windows")]
+    fn read_at(&mut self, position: u64, mut buf: &mut [u8]) -> io::Result<u64> {
+        use std::io::{Read, Seek, SeekFrom};
+
+        self.file.seek(SeekFrom::Start(position))?;
+        self.file.read_exact(&mut buf)?;
+
         Ok(buf.len() as u64)
     }
 

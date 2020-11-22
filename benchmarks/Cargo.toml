@@ -1,0 +1,49 @@
+[package]
+name = "benchmarks"
+version = "0.1.0"
+authors = ["tekjar <raviteja@bytebeam.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+argh = "0.1"
+rumqttc = { path = "../rumqttc" }
+rumqttlog = { path = "../rumqttlog" }
+tokio = { version = "=0.2.22", features = ["full"] }
+futures = { version = "0.3", features = ["compat"] }	
+bytes = "0.5"
+# paho-mqtt = { git = "https://github.com/eclipse/paho.mqtt.rust" }
+paho-mqtt = "0.7"
+async-channel = "1.4"
+pretty_env_logger = "0.4"
+prost = "0.6"
+pprof = { version = "0.3", features = ["flamegraph", "protobuf"] }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+jemallocator = "0.3"
+
+[[bin]]
+name = "rumqttasync"
+path = "rumqttasync.rs"
+
+
+[[bin]]
+name = "rumqttasyncqos0"
+path = "rumqttasyncqos0.rs"
+
+[[bin]]
+name = "rumqttsync"
+path = "rumqttsync.rs"
+
+[[bin]]
+name = "routernxn"
+path = "routernxn.rs"
+
+# [[bin]]
+# name = "pahosync"
+# path = "pahosync.rs"
+
+# [[bin]]
+# name = "pahoasync"
+# path = "pahoasync.rs"

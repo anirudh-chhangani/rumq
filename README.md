@@ -1,30 +1,18 @@
-# rumq 
-[![img](https://github.com/tekjar/rumq/workflows/CI/badge.svg)](https://github.com/tekjar/rumq/actions)
-[![img](https://img.shields.io/discord/633193308033646605?style=flat)](https://discord.gg/mpkSqDg)
+# rumqtt
 
-MQTT ecosystem in rust which strives to be simple, robust and performant
+[![build status](https://github.com/bytebeamio/rumqtt/workflows/master/badge.svg)](https://github.com/tekjar/rumq/actions)
+[![Discord chat](https://img.shields.io/discord/633193308033646605?style=flat)](https://discord.gg/mpkSqDg)
 
-* Fully asynchronous. Built on top of tokio 0.2 and futures 0.3
+MQTT libraries in rust which strives to be simple, robust and performant
 
-#### Client
-* Mqtt eventloop is just a stream. Easily plug it into async ecosystem
-* Takes a `Stream` for user requests. Solves both bounded and unbounded
-  usecases
-* Reconnections are just a loop away. Resumes from previous state
-* Request throttling
-* Inflight queue size based throttling
-* Tls using RustTLS. Cross compilation and multi platform support is painless
+* **mqtt4bytes:**        MQTT 3.1.1 serialization and deserialization
+* **mqtt5bytes:**        MQTT 5 serialization and deserialization
+* **rumqttc:**           A high level, easy to use mqtt client
+* **rumqttd:**           A high performance, embeddable, clustered MQTT broker
 
-#### Broker
-* Embeddable
-* Passes mqtt 3.1.1 paho conformance test suite (Without qos2)
-* Supports retained messages
-* Supports will messages
-* Offline message queueing
-* Deduplicates overlapping subscriptions
+See respective folders for more details
 
+## License
+-----------
+Apache License, Version 2.0 ([LICENSE](./LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
 
-
-#### REFERENCES
-----------------
-* http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
